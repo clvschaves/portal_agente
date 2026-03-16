@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  # PostgreSQL for Keycloak
+  keycloak-db:
+    image: postgres:15-alpine
+    container_name: keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak_password
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    networks:
+      - mock-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak -d keycloak" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Keycloak
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak_password
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8080
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_LOG_LEVEL: info
+      KC_METRICS_ENABLED: true
+      KC_HEALTH_ENABLED: true
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - mock-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ready" ]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+
+  # Ser Aluno Mock MCP
+  ser-aluno-mock-mcp:
+    build: .
+    container_name: ser-aluno-mock-mcp
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8081
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: sereduc-mcps
+      KEYCLOAK_CLIENT_ID: ser-mcp-client
+      DATABASE_FILE: database.json
+    ports:
+      - "8081:8081"
+    depends_on:
+      keycloak:
+        condition: service_started
+    networks:
+      - mock-network
+    volumes:
+      - ./app:/app/app:ro
+      - ./main.py:/app/main.py:ro
+      - ./database.json:/app/database.json:ro
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:8081/health')" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  mock-network:
+    driver: bridge
+
+volumes:
+  keycloak_db_data:
