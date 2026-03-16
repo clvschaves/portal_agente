@@ -13,17 +13,21 @@ import memory_service
 logger = logging.getLogger("AgentService")
 
 # --- Autogen Config ---
+_openai_key = os.environ.get("OPENAI_API_KEY")
+if not _openai_key:
+    raise EnvironmentError("OPENAI_API_KEY environment variable is not set.")
+
 config_list = [
     {
         "model": "gpt-4o",
-        "api_key": os.environ.get("OPENAI_API_KEY", "os.environ.get("OPENAI_API_KEY", "")")
+        "api_key": _openai_key
     }
 ]
 
 config_list_mini = [
     {
         "model": "gpt-4o-mini",
-        "api_key": os.environ.get("OPENAI_API_KEY", "os.environ.get("OPENAI_API_KEY", "")")
+        "api_key": _openai_key
     }
 ]
 
@@ -31,7 +35,7 @@ config_list_mini = [
 KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://localhost:8080")
 REALM = os.environ.get("REALM", "sereduc-mcps")
 CLIENT_ID = os.environ.get("CLIENT_ID", "ser-mcp-client")
-CLIENT_SECRET = os.environ.get("CLIENT_SECRET", "6bavjk9RGsUsnysaJHSM1YoayNCwkmlS")
+CLIENT_SECRET = os.environ.get("CLIENT_SECRET", "")
 MCP_URL = "http://localhost:8081/mcp"
 
 # Cache token manually for non-Streamlit contexts

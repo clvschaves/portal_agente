@@ -8,11 +8,11 @@ load_dotenv()
 
 config_list = [{
     "model": "gpt-4o",
-    "api_key": os.environ.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+    "api_key": os.environ.get("OPENAI_API_KEY", "")
 }]
 config_list_mini = [{
     "model": "gpt-4o-mini",
-    "api_key": os.environ.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+    "api_key": os.environ.get("OPENAI_API_KEY", "")
 }]
 
 def get_aluno_dados(): return "Nome do aluno: Lucas Costa"

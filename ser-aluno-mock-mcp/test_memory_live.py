@@ -7,7 +7,7 @@ load_dotenv()
 
 config_list_mini = [{
     "model": "gpt-4o-mini",
-    "api_key": os.environ.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+    "api_key": os.environ.get("OPENAI_API_KEY", "")
 }]
 RA = "01493115"
 chat_history = "Aluno diz: Quero trancar tudo!\nSofia diz: Poxa vida! Vamos conversar primeiro, o que houve?"

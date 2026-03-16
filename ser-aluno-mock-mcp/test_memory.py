@@ -1,12 +1,13 @@
 import json
 import logging
+import os
 from memory_service import update_profile_with_llm, get_student_profile
 
 logging.basicConfig(level=logging.INFO)
 
 config_list_mini = [{
     "model": "gpt-4o-mini",
-    "api_key": "os.environ.get("OPENAI_API_KEY", "")"
+    "api_key": os.environ.get("OPENAI_API_KEY", "")
 }]
 
 # Define mock chat interaction

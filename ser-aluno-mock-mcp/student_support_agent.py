@@ -8,8 +8,8 @@ from typing import Annotated, Dict, Any
 KEYCLOAK_URL = "http://localhost:8080"
 REALM = "sereduc-mcps"
 CLIENT_ID = "ser-mcp-client"
-# Client secret gerado anteriormente e testado com sucesso
-CLIENT_SECRET = "6bavjk9RGsUsnysaJHSM1YoayNCwkmlS"
+# Client secret para autenticação com o Keycloak (lido de variável de ambiente)
+CLIENT_SECRET = os.environ.get("CLIENT_SECRET", "")
 
 MCP_URL = "http://localhost:8081/mcp"
 
@@ -18,11 +18,11 @@ RA = "01493115"
 COLIGADA = 1
 HABILITACAO = 18486
 
-# Autogen Config
+# Autogen Config (OPENAI_API_KEY deve estar definida no ambiente)
 config_list = [
     {
         "model": "gpt-4o",
-        "api_key": os.environ.get("OPENAI_API_KEY", "os.environ.get("OPENAI_API_KEY", "")")
+        "api_key": os.environ.get("OPENAI_API_KEY", "")
     }
 ]
 
