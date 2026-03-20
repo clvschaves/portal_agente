@@ -3,26 +3,34 @@ import json
 import requests
 import autogen
 from typing import Annotated, Dict, Any
+from dotenv import load_dotenv
 
-# Configuração
-KEYCLOAK_URL = "http://localhost:8080"
-REALM = "sereduc-mcps"
-CLIENT_ID = "ser-mcp-client"
-# Client secret para autenticação com o Keycloak (lido de variável de ambiente)
+# Carrega variáveis de ambiente do arquivo .env (se existir)
+load_dotenv()
+
+
+# Configuração — lida de variáveis de ambiente (.env)
+KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://localhost:8080")
+REALM = os.environ.get("REALM", "sereduc-mcps")
+CLIENT_ID = os.environ.get("CLIENT_ID", "ser-mcp-client")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET", "")
 
-MCP_URL = "http://localhost:8081/mcp"
+MCP_URL = os.environ.get("MCP_URL", "http://localhost:8081/mcp")
 
-# Mock data
-RA = "01493115"
-COLIGADA = 1
-HABILITACAO = 18486
+# Mock data (dados de demonstração — podem ser sobrescritos via env em produção)
+RA = os.environ.get("DEMO_RA", "01493115")
+COLIGADA = int(os.environ.get("DEMO_COLIGADA", "1"))
+HABILITACAO = int(os.environ.get("DEMO_HABILITACAO", "18486"))
 
-# Autogen Config (OPENAI_API_KEY deve estar definida no ambiente)
+# Autogen Config (OPENAI_API_KEY obrigatória no ambiente)
+_openai_key = os.environ.get("OPENAI_API_KEY", "")
+if not _openai_key:
+    raise EnvironmentError("OPENAI_API_KEY não está definida. Configure no arquivo .env.")
+
 config_list = [
     {
-        "model": "gpt-4o",
-        "api_key": os.environ.get("OPENAI_API_KEY", "")
+        "model": os.environ.get("OPENAI_MODEL", "gpt-4o"),
+        "api_key": _openai_key
     }
 ]
 

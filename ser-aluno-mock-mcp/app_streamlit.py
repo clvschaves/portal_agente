@@ -1,7 +1,11 @@
 import streamlit as st
 import memory_service
 import logging
+from dotenv import load_dotenv
 from api.services.agent_service import run_chat_sync
+
+# Carrega variáveis de ambiente do arquivo .env (se existir)
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("StreamlitApp")

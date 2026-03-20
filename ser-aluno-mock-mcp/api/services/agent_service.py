@@ -6,9 +6,14 @@ import logging
 from typing import Dict, Any, Tuple
 import threading
 import asyncio
+from dotenv import load_dotenv
 
 # Assuming memory_service is accessible from the project root
 import memory_service
+
+# Carrega variáveis de ambiente do arquivo .env (se existir)
+load_dotenv()
+
 
 logger = logging.getLogger("AgentService")
 
@@ -31,12 +36,12 @@ config_list_mini = [
     }
 ]
 
-# --- Keycloak & MCP Config ---
+# --- Keycloak & MCP Config — lidos de variáveis de ambiente (.env) ---
 KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", "http://localhost:8080")
 REALM = os.environ.get("REALM", "sereduc-mcps")
 CLIENT_ID = os.environ.get("CLIENT_ID", "ser-mcp-client")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET", "")
-MCP_URL = "http://localhost:8081/mcp"
+MCP_URL = os.environ.get("MCP_URL", "http://localhost:8081/mcp")
 
 # Cache token manually for non-Streamlit contexts
 _token_cache = {"token": None, "expires_at": 0}

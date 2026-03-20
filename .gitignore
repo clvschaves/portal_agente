@@ -9,6 +9,11 @@ dist/
 *.egg
 MANIFEST
 
+# Secrets & Environment variables (NUNCA comitar — contém senhas e API keys)
+.env
+.env.*
+!.env.example
+
 # Virtual environments
 .env
 .venv
