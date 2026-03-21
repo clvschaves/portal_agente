@@ -53,7 +53,7 @@ def get_access_token() -> str:
     # DEV_MODE: skip Keycloak authentication
     dev_mode = os.environ.get("DEV_MODE", "false").lower() == "true"
     if dev_mode:
-        logger.warning("DEV_MODE=true: usando token fake para chamar MCP local")
+        logger.warning(f"DEV_MODE=true: usando token fake para chamar MCP local na URL {MCP_URL}")
         return "dev-mode-fake-token"
     
     if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
@@ -65,8 +65,16 @@ def get_access_token() -> str:
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET
     }
-    response = requests.post(token_url, data=payload)
-    response.raise_for_status()
+    logger.info(f"Obtendo token real do Keycloak na url {token_url} (client: {CLIENT_ID})")
+    try:
+        response = requests.post(token_url, data=payload, timeout=20)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FALHA CRITICA ao tentar autenticar no Keycloak {token_url}: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+             logger.error(f"Response data: {e.response.text}")
+        raise
+        
     data = response.json()
     _token_cache["token"] = data["access_token"]
     _token_cache["expires_at"] = time.time() + data.get("expires_in", 300) - 10
@@ -85,8 +93,16 @@ def call_mcp(method: str, params: Dict[str, Any]) -> Dict[str, Any]:
         "method": method,
         "params": params
     }
-    response = requests.post(MCP_URL, json=data, headers=headers)
-    response.raise_for_status()
+    logger.info(f"Chamando MCP Server url={MCP_URL} method={method}")
+    try:
+        response = requests.post(MCP_URL, json=data, headers=headers, timeout=25)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FALHA CRITICA ao chamar o MCP Server ({MCP_URL}) - method: {method}")
+        logger.error(f"Erro original: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"Status: {e.response.status_code} | Body raw: {e.response.text}")
+        raise
     return response.json()
 
 

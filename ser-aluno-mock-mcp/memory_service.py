@@ -27,6 +27,25 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
+                ra TEXT,
+                title TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                message_id TEXT PRIMARY KEY,
+                session_id TEXT,
+                role TEXT,
+                content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(session_id) REFERENCES chat_sessions(session_id)
+            )
+        ''')
         conn.commit()
 
 def create_job(job_id: str, ra: str):
@@ -66,6 +85,72 @@ def get_job(job_id: str) -> Dict[str, Any]:
             "created_at": row[4]
         }
     return None
+
+import uuid
+
+def create_session(ra: str, title: str = "Nova Conversa") -> str:
+    session_id = str(uuid.uuid4())
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO chat_sessions (session_id, ra, title)
+            VALUES (?, ?, ?)
+        ''', (session_id, ra, title))
+        conn.commit()
+    return session_id
+
+def get_sessions_by_ra(ra: str) -> List[Dict[str, Any]]:
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        # Ordenar da mais recente atualizada para mais antiga
+        c.execute('SELECT session_id, title, created_at, updated_at FROM chat_sessions WHERE ra = ? ORDER BY updated_at DESC', (ra,))
+        rows = c.fetchall()
+    
+    sessions = []
+    for row in rows:
+        sessions.append({
+            "session_id": row[0],
+            "title": row[1],
+            "created_at": row[2],
+            "updated_at": row[3]
+        })
+    return sessions
+
+def update_session_title(session_id: str, new_title: str):
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('UPDATE chat_sessions SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE session_id = ?', (new_title, session_id))
+        conn.commit()
+
+def add_message(session_id: str, role: str, content: str) -> str:
+    message_id = str(uuid.uuid4())
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO chat_messages (message_id, session_id, role, content)
+            VALUES (?, ?, ?, ?)
+        ''', (message_id, session_id, role, content))
+        
+        # Opcional: Atualizar updated_at da sessao
+        c.execute('UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE session_id = ?', (session_id,))
+        conn.commit()
+    return message_id
+
+def get_session_messages(session_id: str) -> List[Dict[str, Any]]:
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('SELECT message_id, role, content, created_at FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC', (session_id,))
+        rows = c.fetchall()
+        
+    messages = []
+    for row in rows:
+        messages.append({
+            "message_id": row[0],
+            "role": row[1],
+            "content": row[2],
+            "created_at": row[3]
+        })
+    return messages
 
 def get_student_profile(ra: str) -> str:
     with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
