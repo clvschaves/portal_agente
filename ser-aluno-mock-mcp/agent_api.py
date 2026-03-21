@@ -26,7 +26,7 @@ app = FastAPI(
 
 class ChatRequest(BaseModel):
     ra: str
-    message: str
+    message: str = ""
     session_id: Optional[str] = None
     whatsapp_number: Optional[str] = None
     coligada: Optional[int] = 1
@@ -47,12 +47,17 @@ def process_agent_task(task_id: str, session_id: str, prompt: str, ra: str, coli
         # Puxa histórico de curto prazo (sessão)
         messages_db = memory_service.get_session_messages(session_id)
         chat_context = ""
+        user_msg_count = 0
         for m in messages_db:
             role_name = "Aluno" if m["role"] == "user" else "Sofia"
-            chat_context += f"[{m['created_at']}] {role_name}: {m['content']}\\n"
+            chat_context += f"[{m['created_at']}] {role_name}: {m['content']}\n"
+            if m["role"] == "user":
+                user_msg_count += 1
             
         if not chat_context:
             chat_context = "Nenhuma mensagem anterior nesta sessão."
+
+        is_initial = (user_msg_count <= 1)
 
         # Chama a execução síncrona do Autogen
         reply_text, internal_disc = run_chat_sync(
@@ -62,7 +67,7 @@ def process_agent_task(task_id: str, session_id: str, prompt: str, ra: str, coli
             session_id=session_id,
             coligada=coligada,
             habilitacao=habilitacao,
-            is_initial=False
+            is_initial=is_initial
         )
         
         logger.info(f"Task {task_id} concluída com sucesso.")

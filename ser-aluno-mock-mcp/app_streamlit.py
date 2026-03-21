@@ -9,7 +9,11 @@ st.set_page_config(page_title="Sofia 🎓", page_icon="🎓")
 st.title("🎓 Sofia - Atendimento SerEduc")
 st.markdown("👋 *Oi! Eu sou a Sofia. Me pergunte sobre suas notas, faltas, ou converse comigo sobre o semestre!*")
 
-# --- UI Sidebar ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "current_session" not in st.session_state:
+    st.session_state.current_session = "new"
+
 with st.sidebar:
     st.header("⚙️ Configurações (Mock)")
     RA = st.text_input("RA do Aluno", value="01493115")
@@ -19,7 +23,6 @@ with st.sidebar:
     st.markdown("---")
     st.header("💬 Conversas")
     
-    # Busca sessões
     sessions = []
     try:
         resp = requests.get(f"{API_URL}/api/sessions/{RA}", timeout=5)
@@ -32,42 +35,58 @@ with st.sidebar:
     for s in sessions:
         session_options[s["session_id"]] = f"🗨️ {s['title']} ({s['created_at'][:10]})"
         
-    selected_session = st.selectbox(
+    options_list = list(session_options.keys())
+    
+    try:
+        current_index = options_list.index(st.session_state.current_session)
+    except ValueError:
+        current_index = 0
+
+    selected = st.selectbox(
         "Selecione uma sessão ou crie nova:",
-        options=list(session_options.keys()),
+        options=options_list,
+        index=current_index,
         format_func=lambda x: session_options[x]
     )
     
-    # Store selected session in state to detect changes
-    if "current_session" not in st.session_state or st.session_state.current_session != selected_session:
-        st.session_state.current_session = selected_session
-        st.session_state.messages = []
-        
-        # Load history if it's an existing session
-        if selected_session != "new":
+    # Switch de sessão
+    if selected != st.session_state.current_session:
+        st.session_state.current_session = selected
+        if selected == "new":
+            st.session_state.messages = []
+        else:
             try:
-                hist_resp = requests.get(f"{API_URL}/api/sessions/{selected_session}/messages")
+                hist_resp = requests.get(f"{API_URL}/api/sessions/{selected}/messages")
                 if hist_resp.status_code == 200:
                     st.session_state.messages = hist_resp.json()
             except:
                 pass
+        st.rerun()
 
-
-# Mostra histórico na UI
+# Renderiza histórico
 for msg in st.session_state.messages:
     role = "assistant" if msg["role"] == "assistant" else "user"
-    with st.chat_message(role):
-        st.markdown(msg["content"])
+    if msg["content"].strip():
+        with st.chat_message(role):
+            st.markdown(msg["content"])
 
+# Callback de chat
+prompt = st.chat_input("Ex: 'Estou com medo das minhas faltas...'")
 
-# Input do usuário
-if prompt := st.chat_input("Ex: 'Estou com medo das minhas faltas...'"):
-    # Render user msg locally immediately
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+# Permite iniciar proativamente se for uma sessão nova e sem mensagens
+trigger_proactive = False
+if st.session_state.current_session == "new" and len(st.session_state.messages) == 0:
+    if st.button("Iniciar Atendimento Proativo (Sem Mensagem)"):
+        prompt = ""
+        trigger_proactive = True
+
+if prompt is not None or trigger_proactive:
+    # Se não for proativo vazio, appenda o user message instantaneamente
+    if prompt.strip():
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
         
-    # Send to API
     with st.chat_message("assistant"):
         placeholder = st.empty()
         placeholder.markdown("A Sofia está pensando... 🧠")
@@ -88,38 +107,38 @@ if prompt := st.chat_input("Ex: 'Estou com medo das minhas faltas...'"):
                 task_id = data["task_id"]
                 new_session_id = data["session_id"]
                 
-                # If it was a new session, we update our local trackers
-                if st.session_state.current_session == "new":
-                    st.session_state.current_session = new_session_id
-                    
-                # Polling for task completion
-                max_attempts = 120 # 2 minutes timeout
+                # Aguarda até o assistente responder (polling de 2s)
+                max_attempts = 120
+                completed = False
                 while max_attempts > 0:
                     status_resp = requests.get(f"{API_URL}/api/chat/{task_id}")
                     if status_resp.status_code == 200:
                         status_data = status_resp.json()
                         if status_data["status"] == "completed":
-                            result = status_data.get("result", {})
-                            reply = result.get("reply", "") if isinstance(result, dict) else str(result)
-                            placeholder.markdown(reply)
-                            st.session_state.messages.append({"role": "assistant", "content": reply})
+                            completed = True
                             break
                         elif status_data["status"] == "failed":
-                            err = f"Desculpe, a Sofia teve um problema: {status_data.get('result')}"
-                            placeholder.markdown(err)
-                            st.session_state.messages.append({"role": "assistant", "content": err})
+                            completed = True
                             break
                     time.sleep(2)
                     max_attempts -= 1
                     
-                if max_attempts <= 0:
-                    reply = "A Sofia demorou a responder, tente novamente."
-                    placeholder.markdown(reply)
-                    st.session_state.messages.append({"role": "assistant", "content": reply})
+                if not completed:
+                    st.error("A inteligência artificial demorou muito a responder.")
+                
+                # Fetch atualizado das mensagens pela API
+                st.session_state.current_session = new_session_id
+                try:
+                    hist_resp = requests.get(f"{API_URL}/api/sessions/{new_session_id}/messages")
+                    if hist_resp.status_code == 200:
+                        st.session_state.messages = hist_resp.json()
+                except:
+                    pass
                     
             else:
                 placeholder.markdown(f"Erro na requisição: {post_resp.status_code} - {post_resp.text}")
         except Exception as e:
             placeholder.markdown(f"Opa, tive um problema técnico: {str(e)}")
             
-        st.rerun()  # reload to show newly created session in the sidebar
+        # Força rerun para fixar o seletor na sessão atual via UI e renderizar final  
+        st.rerun()

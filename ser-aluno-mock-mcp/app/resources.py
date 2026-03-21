@@ -219,7 +219,7 @@ class ResourceHandler:
         
         # Campos de nota e falta que devem retornar "N/E" quando ausentes
         nota_falta_fields = {
-            'nota', 'notaV1', 'notaV2', 'notaFinal', 'mediaAluno',
+            'NOTA', 'notaV1', 'notaV2', 'notaFinal', 'mediaAluno',
             'mediaTurmaV1', 'mediaTurmaV2', 'mediaTurmaFinal', 'mediaTurma',
             'mediaGeral', 'mediaAv1', 'mediaAv2', 'mediaFinal',
             'faltas', 'faltasCometidas', 'maximoFaltasDisciplina', 'mediaFaltasTurma'

@@ -308,7 +308,20 @@ def run_chat_sync(prompt: str, chat_context: str, ra: str, session_id: str, coli
     manager, proxy = init_autogen(ra, semantic_memory, coligada, habilitacao)
     
     if is_initial:
-        full_message = "[SISTEMA]: O aluno acabou de abrir o chat. Por favor, inicie a conversa PROATIVAMENTE. Consulte os dados dele usando `get_aluno_dados` para descobrir e chamá-lo pelo nome, e se houver um [GANCHO PARA O PRÓXIMO CONTATO] na memória, puxe esse assunto imediatamente para demonstrar empatia."
+        if prompt.strip():
+            msg_context = f"mandando a primeira mensagem: '{prompt}'. Por favor, use essa mensagem como ponto de partida juntamente com uma abordagem PROATIVA."
+        else:
+            msg_context = "apenas abrindo o chat (sem enviar mensagem). Por favor, inicie o contato de forma PROATIVA."
+            
+        full_message = f"""[SISTEMA]: O aluno acabou de iniciar a sessão {msg_context}
+        
+Sua tarefa imediata:
+1. Consulte os dados do aluno usando `get_aluno_dados` para descobrir e chamá-lo pelo nome.
+2. Busque tópicos recentes na sua memória de longo prazo (sobre este aluno).
+3. Utilize o "gancho para o próximo contato" (se houver na memória) para engajar o aluno naturalmente!
+4. Responda ao aluno de forma acolhedora, dando as boas-vindas.
+
+Atendente, processe via A2A. Gerente, garanta a qualidade e finalize com [MENSAGEM AO ALUNO] e TERMINATE quando pronto."""
     else:
         full_message = f"Histórico:\\n{chat_context}\\nAluno diz agora: {prompt}\\n\\nAtendente, processe via A2A. Gerente, garanta a qualidade e finalize com [MENSAGEM AO ALUNO] e TERMINATE quando pronto."
         
