@@ -1,420 +1,132 @@
-# Ser Aluno Mock MCP
+# Ser Aluno Mock MCP + Streamlit Agent UI
 
-Servidor MCP (Model Context Protocol) **mock** em Python para testes e desenvolvimento com dados simulados do sistema SerEduc.
+Servidor MCP (Model Context Protocol) **mock** em Python para testes e desenvolvimento com dados simulados do sistema SerEduc, integrado agora a um **Client Web no Streamlit** e uma **API Assíncrona com Memória Vetorial RAG** usando ChromaDB e SQLite.
 
-## 🚀 Quick Start
+Esta aplicação funciona tanto como um mock isolado do sistema escolar quanto como uma interface final para o Agente Autogen interagir de forma inteligente, mantendo estado cruzado de sessões.
+
+## ✨ Características Adicionadas
+
+- **🖥️ Streamlit Frontend**: UI responsiva via Web para falar com o agente, com separação de sessões.
+- **🧠 Memória de Longo Prazo (RAG)**: O Agente busca memórias do banco vetorial local (ChromaDB) de conversas passadas para responder de forma contextual.
+- **📁 Banco SQLite Local**: Gerenciamento de sessões de conversa e perfis psicológicos/acadêmicos gerados pelo LLM a cada sessão.
+- **💬 Início Proativo**: O agente é capaz de puxar o assunto da última conversa sozinho se você apenas logar sem dizer nada.
+- **⚡ API Assíncrona (FastAPI)**: As chamadas pesadas ao LLM rodam em jobs de background (polling do front-end) protegendo o timeout do HTTP.
+
+---
+
+## 🚀 Quick Start (Como instalar e rodar)
+
+Você vai precisar instalar as novas dependências de Inteligência Artificial e Banco Vetorial.
+
+### 1. Instalar as Dependências
 
 ```bash
 # Clone e acesse o diretório
 cd ser-aluno-mock-mcp
 
-# Subir ambiente completo (Keycloak + Mock MCP)
-make quickstart
+# Crie e ative seu ambiente virtual (recomendado)
+python3 -m venv .venv
+source .venv/bin/activate
 
-# OU manualmente:
-make up          # Subir serviços
-make setup       # Configurar Keycloak automaticamente
-make test        # Testar funcionamento completo
+# Instale os requisitos (incluindo dependências do RAG e UI)
+pip install -r requirements.txt
+pip install chromadb streamlit
 ```
 
-**Pronto!** O ambiente estará rodando em:
+Certifique-se de configurar sua chave da OpenAI exportada na variável do terminal ou no `.env`:
+```bash
+export OPENAI_API_KEY="sk-..."
+```
 
-- **Keycloak Admin**: http://localhost:8080/admin (admin/admin)
-- **Mock MCP**: http://localhost:8081
+### 2. Rodar a API Backend (FastAPI + ChromaDB)
 
-## ✨ Características
+Em um terminal ativo com a venv, inicie o servidor na porta `8000`:
 
-- **🗂️ Dados Locais**: Uses arquivo JSON local (`database.json`) ao invés de APIs externas
-- **🔄 Compatível**: Mantém mesma interface do `ser-aluno-mcp` original
-- **🧪 Para Testes**: Ideal para desenvolvimento e testes sem dependências externas
-- **👤 Dados Realistas**: Inclui dados completos do aluno RA `01493115`
-- **🐳 Docker Ready**: Ambiente completo com Docker Compose
-- **⚙️ Setup Automático**: Scripts para configuração automática do Keycloak
-- **📋 Makefile**: Comandos simplificados para todas as operações
+```bash
+python -m uvicorn agent_api:app --reload --port 8000
+```
+Isso vai criar automaticamente os bancos `aluno_memory.db` (SQLite) e a pasta `./chroma_data` (Banco Vetorial).
 
-## 🛠 Tecnologias
+### 3. Rodar o Client de Atendimento (Streamlit)
 
-- **Python 3.11**
-- **FastAPI** - Framework web assíncrono
-- **MCP SDK** - SDK oficial do Model Context Protocol
-- **Keycloak** - Autenticação OAuth (apenas para validação de tokens)
-- **Docker & Docker Compose** - Containerização
-- **PostgreSQL** - Banco do Keycloak
+Em outro terminal ativo com a venv, suba a aplicação gráfica na porta `8501`:
 
-## 📁 Estrutura do Projeto
+```bash
+python -m streamlit run app_streamlit.py
+```
+Acesse no seu navegador: `http://localhost:8501`
+
+---
+
+## 🛠 Como usar a API Assíncrona do Agente
+
+Se você quiser integrar este agente em outro sistema (como um bot de WhatsApp) em vez do Streamlit, use a API Assíncrona REST.
+
+### 1. Iniciar uma Conversa
+
+```bash
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ra": "01493115",
+    "message": "Qual é a minha média de faltas no curso?",
+    "session_id": null
+  }'
+```
+**Atenção (Contato Proativo)**: Se você mandar a `"message": ""`, a API entende que é apenas uma conexão nova de login e o Agente vai saudar o aluno buscando dinamicamente o último gancho na memória.
+
+**Resposta de Retorno**:
+```json
+{
+  "task_id": "ee76dfb4-c6a6...",
+  "session_id": "f5f0b5d1-...",
+  "status": "pending",
+  "message": "Mensagem recebida e em processamento na fila da IA."
+}
+```
+
+### 2. Fazer Polling (Aguardar a reposta da IA)
+
+Use o `task_id` gerado para perguntar o status:
+
+```bash
+curl http://localhost:8000/api/chat/ee76dfb4-c6a6...
+```
+*(Fique repetindo esse request a cada 2 segundos até o status virar `completed`)*
+
+**Resposta de Retorno (Sucesso)**:
+```json
+{
+  "task_id": "ee76dfb4-c6a6...",
+  "ra": "01493115",
+  "status": "completed",
+  "result": {
+    "reply": "Olá João! Sua média atual de faltas está boa, você não corre riscos. Algo mais que posso ajudar?",
+    "internal_discussion": "Acessei o MCP e li o histórico..."
+  },
+  "created_at": "2024-03-22T10:00:00"
+}
+```
+
+---
+
+## 📂 Recursos MCP Mantidos e Suporte
+
+O ecossistema nativo do MCP local e os dados em JSON continuam rodando conforme arquitetura principal:
+
+- **Dados Locais**: A biblioteca `student_support_agent.py` consulta os tools MCP simulados pelas bibliotecas locais consumindo o arquivo `database.json`.
+- **RA Mockado**: Use o RA restrito **01493115** para que a aplicação de ponta a ponta tenha dados escolares fakes para manipular e ler.
+
+## 🗂 Estrutura do Projeto Agente
 
 ```
 ser-aluno-mock-mcp/
-├── app/
-│   ├── models/              # Modelos Pydantic (DTOs)
-│   ├── services/            # Serviços (OAuth, Mock Service)
-│   ├── middleware/          # Middleware de autenticação
-│   ├── resources.py         # Handlers de resources MCP
-│   └── tools.py             # Handlers de tools MCP
-├── main.py                  # Aplicação FastAPI principal
-├── config.py                # Configurações
-├── database.json            # Base de dados mock
-├── requirements.txt         # Dependências Python
-├── Dockerfile               # Container da aplicação
-├── docker-compose.yml       # Orquestração dos serviços
-├── setup-keycloak.sh        # Setup automático do Keycloak
-├── test-mock.sh            # Testes automatizados
-├── Makefile                 # Comandos simplificados
-├── KEYCLOAK-SETUP.md       # Guia de configuração do Keycloak
-└── README.md               # Este arquivo
+├── agent_api.py            # API Assíncrona (Gestão de Sessions e Polling)
+├── app_streamlit.py        # Interface Web Chat consumindo a agent_api
+├── memory_service.py       # Gerenciamento SQLite (Sessões, Jobs, Dossiê Autogen)
+├── vector_memory_service.py # Gerenciamento RAG ChromaDB (Memória Semântica longa)
+├── student_support_agent.py # Definição do Agente e integração LLM -> MCP Tools
+├── database.json            # Base de dados Fake Escolar
+├── requirements.txt         # Pacotes (adicionar chromadb, streamlit)
+└── chroma_data/             # Pasta local do Banco Vetorial (auto-gerada)
 ```
-
-## 🗂️ Dados Mock Incluídos
-
-O arquivo `database.json` contém:
-
-- **👤 Aluno**: João Silva Santos (RA: 01493115)
-- **🎓 Curso**: Comunicação Social - Publicidade e Propaganda (ID: 18486)
-- **📚 5 Disciplinas** com notas, faltas e dados completos
-- **📋 Dados Escolares** completos com status de matrícula
-
-## 📚 Recursos MCP (Resources)
-
-1. **aluno:dados** - Retorna os dados cadastrais do aluno
-   - Parâmetros obrigatórios: `codColigada` (int), `ra` (string)
-
-2. **aluno:cursos** - Retorna os cursos/habilitações do aluno
-   - Parâmetros: `ra` (string)
-
-3. **aluno:disciplinas** - Retorna as disciplinas matriculadas do aluno
-   - Parâmetros obrigatórios: `ra` (string), `idHabilitacaoFilial` (int), `codColigada` (int)
-   - Parâmetros opcionais: filtros por período, status, notas/faltas, etc.
-
-4. **aluno:dados-escolares** - Retorna os dados escolares do aluno
-   - Parâmetros obrigatórios: `ra` (string)
-
-## 🔧 Ferramentas MCP (Tools)
-
-1. **get_aluno_summary** - Obtém resumo completo dos dados do aluno
-   - Parâmetros: `ra`, `codColigada`, `idHabilitacaoFilial`, `includeNotasFaltas`
-
-## 🔐 Autenticação
-
-⚠️ **IMPORTANTE**: Este mock requer autenticação Keycloak para manter compatibilidade com o sistema original.
-
-- **OAuth Bearer Token** via Keycloak
-- **Client Credentials Flow** para autenticação de serviços
-- **Configuração automática** via scripts incluídos
-- **Desabilitação opcional** para desenvolvimento (veja seção "Desenvolvimento")
-
-## 🌐 Endpoints HTTP
-
-- `GET /health` - Health check (inclui indicador de modo mock)
-- `GET /mcp` - Descoberta do servidor MCP (indica modo mock)
-- `GET /mcp/info` - Informações detalhadas do servidor
-- `POST /mcp` - Processa requisições JSON-RPC 2.0 do protocolo MCP
-
-## ⚙️ Configuração
-
-### Variáveis de Ambiente
-
-```bash
-# Server
-HOST=0.0.0.0
-PORT=8081  # Porta diferente para evitar conflitos
-
-# Keycloak OAuth (para validação de tokens)
-KEYCLOAK_URL=http://localhost:8080
-KEYCLOAK_REALM=sereduc-mcps
-KEYCLOAK_CLIENT_ID=ser-mcp-client
-
-# Database mock
-DATABASE_FILE=database.json
-```
-
-### Configuração do .env (opcional)
-
-```bash
-cp .env.example .env
-# Edite as variáveis conforme necessário
-```
-
-## 🚀 Formas de Execução
-
-### 1. Docker Compose (Recomendado)
-
-```bash
-# Subir ambiente completo
-make up
-
-# Configurar Keycloak automaticamente
-make setup
-
-# Testar tudo
-make test
-
-# Ver status
-make health
-```
-
-### 2. Ambiente Local de Desenvolvimento
-
-```bash
-# Subir apenas Keycloak
-make up-keycloak
-
-# Executar Mock MCP localmente
-make dev
-```
-
-### 3. Docker Manual
-
-```bash
-# Build da imagem
-docker build -t ser-aluno-mock-mcp .
-
-# Executar container
-docker run -p 8081:8081 \
-  -e KEYCLOAK_URL=http://host.docker.internal:8080 \
-  ser-aluno-mock-mcp
-```
-
-## 📋 Comandos do Makefile
-
-Execute `make help` para ver todos os comandos disponíveis:
-
-```bash
-make help           # Mostrar ajuda
-make up             # Subir todos os serviços
-make down           # Parar todos os serviços
-make setup          # Configurar Keycloak automaticamente
-make test           # Executar testes completos
-make health         # Verificar status dos serviços
-make logs           # Mostrar logs dos serviços
-make clean          # Limpeza completa (remove dados)
-make quickstart     # Setup completo em um comando
-```
-
-## 🧪 Testando o Mock
-
-### Teste Automático Completo
-
-```bash
-# Executa bateria completa de testes
-make test
-```
-
-### Testes Manuais
-
-#### 1. Health Check
-
-```bash
-curl http://localhost:8081/health
-```
-
-#### 2. Info do MCP
-
-```bash
-curl http://localhost:8081/mcp/info
-```
-
-#### 3. Obter Token de Acesso
-
-```bash
-# Substitua CLIENT_SECRET pelo valor obtido no Keycloak
-curl -X POST http://localhost:8080/realms/sereduc-mcps/protocol/openid-connect/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=ser-mcp-client&client_secret=YOUR_CLIENT_SECRET"
-```
-
-#### 4. Consultar Dados do Aluno
-
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "resources/read",
-    "params": {
-      "uri": "aluno:dados",
-      "arguments": {
-        "codColigada": 1,
-        "ra": "01493115"
-      }
-    }
-  }'
-```
-
-## 📖 Exemplos de Uso MCP
-
-### Consultar dados do aluno
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "resources/read",
-  "params": {
-    "uri": "aluno:dados",
-    "arguments": {
-      "codColigada": 1,
-      "ra": "01493115"
-    }
-  }
-}
-```
-
-### Consultar disciplinas com notas
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "resources/read",
-  "params": {
-    "uri": "aluno:disciplinas",
-    "arguments": {
-      "ra": "01493115",
-      "idHabilitacaoFilial": 18486,
-      "codColigada": 1,
-      "retornarNotasFaltas": true
-    }
-  }
-}
-```
-
-### Usar ferramenta de resumo
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "method": "tools/call",
-  "params": {
-    "name": "get_aluno_summary",
-    "arguments": {
-      "ra": "01493115",
-      "codColigada": 1,
-      "idHabilitacaoFilial": 18486,
-      "includeNotasFaltas": true
-    }
-  }
-}
-```
-
-## ⚖️ Diferenças do Ser Aluno MCP Original
-
-| Aspecto               | Original             | Mock                  |
-| --------------------- | -------------------- | --------------------- |
-| **🗂️ Fonte de Dados** | APIs externas        | JSON local            |
-| **🔐 Autenticação**   | Keycloak + Services  | Apenas Keycloak OAuth |
-| **📊 Dados**          | Dinâmicos/Reais      | Estáticos/Mock        |
-| **🌐 Porta Padrão**   | 8080                 | 8081                  |
-| **🔧 Dependências**   | Múltiplos serviços   | Apenas Keycloak       |
-| **⚡ Ferramentas**    | Atualização de dados | Apenas leitura        |
-| **🚀 Deploy**         | Complexo             | Docker Compose        |
-
-## 💻 Desenvolvimento
-
-### Desabilitar Autenticação
-
-Para usar o mock sem autenticação Keycloak, comente esta linha do `main.py`:
-
-```python
-# Comentar para desabilitar autenticação:
-# app.add_middleware(BearerTokenMiddleware, keycloak_oauth_service=keycloak_oauth_service)
-```
-
-### Executar Localmente
-
-```bash
-# Instalar dependências
-make install
-
-# Executar em modo dev (com hot reload)
-make dev
-
-# Formatar código
-make format
-
-# Verificar código
-make lint
-```
-
-### Modificar Dados Mock
-
-Edite o arquivo `database.json` para modificar:
-
-- Dados do aluno
-- Curso e habilitações
-- Disciplinas e notas
-- Informações escolares
-
-## 📋 Dados de Teste
-
-O aluno mock tem os seguintes dados:
-
-- **👤 Nome**: João Silva Santos
-- **🎓 RA**: 01493115
-- **📚 Curso**: Comunicação Social - Publicidade e Propaganda (ID: 18486)
-- **📅 Período**: 5º período (2026/1)
-- **📌 Status**: Pré-matrícula Web
-- **📊 Disciplinas**: 5 disciplinas com notas variadas (6.8 a 9.2)
-
-⚠️ **Importante**: Apenas o RA `01493115` retorna dados. Outros RAs retornarão dados vazios ou erro.
-
-## 🔧 Troubleshooting
-
-### Serviços não sobem
-
-```bash
-# Verificar logs
-make logs
-
-# Verificar status
-make ps
-
-# Limpar e tentar novamente
-make clean
-make up
-```
-
-### Keycloak não responde
-
-```bash
-# Verificar se está pronto
-make health
-
-# Aguardar inicialização (pode levar 2-3 minutos)
-make logs-keycloak
-```
-
-### Erro de autenticação no Mock
-
-```bash
-# Verificar client secret no Keycloak
-make open-keycloak
-
-# Reconfigurar automaticamente
-make setup
-```
-
-## 📚 Documentação Adicional
-
-- [KEYCLOAK-SETUP.md](KEYCLOAK-SETUP.md) - Guia detalhado de configuração do Keycloak
-- [../KEYCLOAK-AUTH.md](../KEYCLOAK-AUTH.md) - Documentação sobre autenticação OAuth para MCPs
-- [../SECURITY-AUDIT.md](../SECURITY-AUDIT.md) - Auditoria de segurança
-
-## 🎯 Guidelines
-
-- Use Python 3.11+ features
-- Compatível com o MCP protocol 2024-11-05
-- Mantém compatibilidade com ser-aluno-mcp original
-- Segue padrões de segurança OAuth
-- Dados sempre retornam para RA `01493115`
-
-## 🌐 URLs Importantes
-
-Execute `make urls` para ver todas as URLs, ou acesse:
-
-- **🔐 Keycloak Admin**: http://localhost:8080/admin (admin/admin)
-- **🤖 Mock MCP Health**: http://localhost:8081/health
-- **🤖 Mock MCP Info**: http://localhost:8081/mcp/info
-- **🔑 Token Endpoint**: http://localhost:8080/realms/sereduc-mcps/protocol/openid-connect/token
