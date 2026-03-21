@@ -47,8 +47,15 @@ MCP_URL = os.environ.get("MCP_URL", "http://localhost:8081/mcp")
 _token_cache = {"token": None, "expires_at": 0}
 
 def get_access_token() -> str:
-    """Obtém um bearer token do Keycloak."""
+    """Obtém um bearer token do Keycloak (ou token fake em DEV_MODE)."""
     import time
+    
+    # DEV_MODE: skip Keycloak authentication
+    dev_mode = os.environ.get("DEV_MODE", "false").lower() == "true"
+    if dev_mode:
+        logger.warning("DEV_MODE=true: usando token fake para chamar MCP local")
+        return "dev-mode-fake-token"
+    
     if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
         return _token_cache["token"]
         
@@ -99,16 +106,37 @@ def init_autogen(ra: str, coligada: int, habilitacao: int):
     }
 
     perfil_atual = memory_service.get_student_profile(ra)
+    # Detectar se é primeiro contato (sem histórico real salvo)
+    is_first_contact = "Nenhum perfil prévio encontrado" in perfil_atual
+
+    # Instrução de contexto baseada no histórico real
+    if is_first_contact:
+        contexto_memoria = (
+            "[SITUAÇÃO]: Este é o PRIMEIRO CONTATO do aluno com a Sofia. NÃO existe histórico anterior. "
+            "Você NUNCA conversou com este aluno antes. PROIBIDO mencionar conversas passadas."
+        )
+        instrucao_gerente_memoria = (
+            "ATENÇÃO CRÍTICA: Este é o PRIMEIRO CONTATO. NÃO existe histórico anterior. "
+            "NUNCA mencione conversas passadas, metas anteriores ou qualquer assunto de interações prévias. "
+            "Se for saudação inicial, a Sofia deve se apresentar brevemente como assistente da SerEduc e perguntar como pode ajudar."
+        )
+    else:
+        contexto_memoria = (
+            f"[MEMÓRIA DE LONGO PRAZO - PERFIL DO ALUNO]\\n{perfil_atual}"
+        )
+        instrucao_gerente_memoria = (
+            "Se houver um [GANCHO PARA O PRÓXIMO CONTATO] no perfil, use-o naturalmente na conversa."
+        )
 
     atendente = autogen.AssistantAgent(
         name="Atendente",
         system_message=(
             "Você é a 'Sofia', uma atendente virtual jovial, amena e acolhedora da instituição SerEduc. "
-            "Sua função principal é conversar de forma fluida com o aluno como se fosse humano, usando a memória de longo prazo para puxar assuntos passados. "
+            "Sua função principal é conversar de forma fluida com o aluno como se fosse humano. "
             "Sempre que precisar saber quem é o aluno (dados) ou quando o aluno pedir sobre notas ou faltas, USE AS FERRAMENTAS. "
-            f"\\n\\n[MEMÓRIA DE LONGO PRAZO - PERFIL DO ALUNO]\\n{perfil_atual}\\n\\n"
+            f"\\n\\n{contexto_memoria}\\n\\n"
             "COMUNICAÇÃO A2A (AGENT-TO-AGENT): Sua comunicação interna não é estocástica, deve seguir estritamente o protocolo abaixo:\\n"
-            "[RACIOCÍNIO]: (Escreva seu pensamento passo-a-passo sobre o que o aluno quer e qual o gancho da memória usar)\\n"
+            "[RACIOCÍNIO]: (Escreva seu pensamento passo-a-passo sobre o que o aluno quer e o contexto da memória)\\n"
             "[FERRAMENTAS]: (Declare quais ferramentas vai usar caso necessário)\\n"
             "[PROPOSTA DE RESPOSTA]: (O texto humanizado que você sugere enviar ao aluno)\\n"
             "Sua proposta será enviada ao Gerente para aprovação obrigatória."
@@ -120,11 +148,13 @@ def init_autogen(ra: str, coligada: int, habilitacao: int):
         name="Gerente",
         system_message=(
             "Você é o Gerente de Qualidade. Sua função é avaliar a proposta da 'Atendente' usando protocolo A2A. "
-            "A resposta deve ser fluida, chamar o aluno pelo nome e, se houver um [GANCHO PARA O PRÓXIMO CONTATO] na memória, puxar o assunto imediatamente! "
+            "A resposta deve ser fluida e chamar o aluno pelo PRIMEIRO NOME. "
+            f"{instrucao_gerente_memoria} "
+            "REGRA ABSOLUTA: NUNCA invente ou suponha conversas, compromissos ou assuntos que não estejam explicitamente no perfil fornecido. "
             "Sua avaliação interna não é estocástica, siga o protocolo rígido:\\n"
             "[ANÁLISE]: (Analise criticamente a proposta da Atendente)\\n"
             "[DECISÃO]: (APROVAR ou REFATORAR)\\n"
-            "[MENSAGEM AO ALUNO]: (A versão final polida direcianada ao aluno. Encerre imediatamente após com a palavra TERMINATE.)"
+            "[MENSAGEM AO ALUNO]: (A versão final polida direcionada ao aluno. Encerre imediatamente após com a palavra TERMINATE.)"
         ),
         llm_config=llm_config_mini,
     )

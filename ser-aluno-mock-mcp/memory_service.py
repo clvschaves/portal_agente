@@ -18,7 +18,54 @@ def init_db():
                 dossie TEXT
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chat_jobs (
+                job_id TEXT PRIMARY KEY,
+                ra TEXT,
+                status TEXT,
+                result TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
+
+def create_job(job_id: str, ra: str):
+    """Cria um novo job assíncrono com status pending."""
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO chat_jobs (job_id, ra, status, result)
+            VALUES (?, ?, 'pending', null)
+        ''', (job_id, ra))
+        conn.commit()
+
+def update_job(job_id: str, status: str, result: str = None):
+    """Atualiza o status de um job assíncrono longo (ex: 'completed', 'failed')."""
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('''
+            UPDATE chat_jobs 
+            SET status = ?, result = ?
+            WHERE job_id = ?
+        ''', (status, result, job_id))
+        conn.commit()
+
+def get_job(job_id: str) -> Dict[str, Any]:
+    """Retorna o status atual de um job pelo id."""
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('SELECT job_id, ra, status, result, created_at FROM chat_jobs WHERE job_id = ?', (job_id,))
+        row = c.fetchone()
+        
+    if row:
+        return {
+            "job_id": row[0],
+            "ra": row[1],
+            "status": row[2],
+            "result": row[3],
+            "created_at": row[4]
+        }
+    return None
 
 def get_student_profile(ra: str) -> str:
     with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
