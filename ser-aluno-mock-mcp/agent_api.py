@@ -59,6 +59,7 @@ def process_agent_task(task_id: str, session_id: str, prompt: str, ra: str, coli
             prompt=prompt,
             chat_context=chat_context,
             ra=ra,
+            session_id=session_id,
             coligada=coligada,
             habilitacao=habilitacao,
             is_initial=False

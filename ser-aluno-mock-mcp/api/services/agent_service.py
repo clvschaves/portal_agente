@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 # Assuming memory_service is accessible from the project root
 import memory_service
+import vector_memory_service
 
 # Carrega variáveis de ambiente do arquivo .env (se existir)
 load_dotenv()
@@ -106,7 +107,7 @@ def call_mcp(method: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return response.json()
 
 
-def init_autogen(ra: str, coligada: int, habilitacao: int):
+def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int):
     llm_config = {
         "config_list": config_list, 
         "timeout": 120,
@@ -125,12 +126,14 @@ def init_autogen(ra: str, coligada: int, habilitacao: int):
     # Detectar se é primeiro contato (sem histórico real salvo)
     is_first_contact = "Nenhum perfil prévio encontrado" in perfil_atual
 
-    # Instrução de contexto baseada no histórico real
     if is_first_contact:
         contexto_memoria = (
             "[SITUAÇÃO]: Este é o PRIMEIRO CONTATO do aluno com a Sofia. NÃO existe histórico anterior. "
             "Você NUNCA conversou com este aluno antes. PROIBIDO mencionar conversas passadas."
         )
+        if semantic_memory:
+            contexto_memoria += f"\n\n[MEMÓRIAS SOLTAS RECUPERADAS (RAG)]\n{semantic_memory}"
+            
         instrucao_gerente_memoria = (
             "ATENÇÃO CRÍTICA: Este é o PRIMEIRO CONTATO. NÃO existe histórico anterior. "
             "NUNCA mencione conversas passadas, metas anteriores ou qualquer assunto de interações prévias. "
@@ -138,8 +141,11 @@ def init_autogen(ra: str, coligada: int, habilitacao: int):
         )
     else:
         contexto_memoria = (
-            f"[MEMÓRIA DE LONGO PRAZO - PERFIL DO ALUNO]\\n{perfil_atual}"
+            f"[MEMÓRIA DE LONGO PRAZO - PERFIL DO ALUNO]\n{perfil_atual}"
         )
+        if semantic_memory:
+            contexto_memoria += f"\n\n[MEMÓRIA EPISÓDICA SEMÂNTICA RELEVANTE PARA ESTA PERGUNTA (RAG)]\n{semantic_memory}"
+            
         instrucao_gerente_memoria = (
             "Se houver um [GANCHO PARA O PRÓXIMO CONTATO] no perfil, use-o naturalmente na conversa."
         )
@@ -292,9 +298,14 @@ def extract_final_message(chat_history):
     return reply_text
 
 
-def run_chat_sync(prompt: str, chat_context: str, ra: str, coligada: int, habilitacao: int, is_initial: bool = False):
+def run_chat_sync(prompt: str, chat_context: str, ra: str, session_id: str, coligada: int, habilitacao: int, is_initial: bool = False):
     """Synchronously run the chat using Autogen."""
-    manager, proxy = init_autogen(ra, coligada, habilitacao)
+    
+    # 1. Recupera RAG Memos 
+    memories = vector_memory_service.retrieve_memories(ra, prompt, top_k=5)
+    semantic_memory = "\\n---\\n".join(memories) if memories else ""
+    
+    manager, proxy = init_autogen(ra, semantic_memory, coligada, habilitacao)
     
     if is_initial:
         full_message = "[SISTEMA]: O aluno acabou de abrir o chat. Por favor, inicie a conversa PROATIVAMENTE. Consulte os dados dele usando `get_aluno_dados` para descobrir e chamá-lo pelo nome, e se houver um [GANCHO PARA O PRÓXIMO CONTATO] na memória, puxe esse assunto imediatamente para demonstrar empatia."
@@ -333,6 +344,12 @@ def run_chat_sync(prompt: str, chat_context: str, ra: str, coligada: int, habili
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
+                # 1. Salva o RAG no ChromaDB
+                if session_id:
+                    vector_memory_service.store_memory(ra, session_id, "user", prompt)
+                    vector_memory_service.store_memory(ra, session_id, "assistant", reply_text)
+                    
+                # 2. Atualiza Dossiê no SQLite     
                 memory_service.update_profile_with_llm(ra, contexto_novo, config_list_mini)
             except Exception as e:
                 logger.error(f"Erro na thread de memória: {e}")
@@ -343,9 +360,9 @@ def run_chat_sync(prompt: str, chat_context: str, ra: str, coligada: int, habili
         
     return reply_text, internal_discussion
 
-async def process_chat_async(prompt: str, chat_context: str, ra: str, coligada: int, habilitacao: int, is_initial: bool = False):
+async def process_chat_async(prompt: str, chat_context: str, ra: str, session_id: str, coligada: int, habilitacao: int, is_initial: bool = False):
     """Asynchronously process the chat using a thread pool to avoid blocking the event loop."""
     return await asyncio.to_thread(
         run_chat_sync,
-        prompt, chat_context, ra, coligada, habilitacao, is_initial
+        prompt, chat_context, ra, session_id, coligada, habilitacao, is_initial
     )

@@ -10,6 +10,7 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
+
 class KeycloakOAuthService:
     """Service for validating OAuth tokens from Keycloak."""
     
@@ -30,6 +31,10 @@ class KeycloakOAuthService:
     
     async def get_jwks(self) -> dict:
         """Get JWKS (JSON Web Key Set) from Keycloak."""
+        if settings.dev_mode:
+            logger.warning("DEV_MODE=true: skipping Keycloak JWKS fetch")
+            return {"keys": []}
+
         if self._jwks_cache:
             return self._jwks_cache
         
@@ -52,6 +57,9 @@ class KeycloakOAuthService:
         Returns:
             True if token is valid, False otherwise
         """
+        if settings.dev_mode:
+            logger.warning("DEV_MODE=true: bypassing token validation")
+            return True
         try:
             # Get JWKS
             jwks = await self.get_jwks()

@@ -46,15 +46,18 @@ app.add_middleware(BearerTokenMiddleware, keycloak_oauth_service=keycloak_oauth_
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup."""
-    logger.info("Starting ser-aluno-mock-mcp server...")
+    logger.info(f"Starting ser-aluno-mock-mcp server... (DEV_MODE={settings.dev_mode})")
     
     # Test Keycloak OAuth connection by fetching JWKS
     try:
         await keycloak_oauth_service.get_jwks()
-        logger.info("Successfully connected to Keycloak OAuth")
+        logger.info("Successfully connected to Keycloak OAuth (or DEV_MODE bypass)")
     except Exception as e:
-        logger.error(f"Failed to connect to Keycloak OAuth: {e}")
-        raise Exception("Failed to connect to Keycloak OAuth")
+        if settings.dev_mode:
+            logger.warning(f"Keycloak not available, but DEV_MODE=true — continuing anyway: {e}")
+        else:
+            logger.error(f"Failed to connect to Keycloak OAuth: {e}")
+            raise Exception("Failed to connect to Keycloak OAuth")
 
 
 @app.on_event("shutdown")
