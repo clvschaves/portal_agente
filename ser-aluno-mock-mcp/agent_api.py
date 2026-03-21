@@ -100,7 +100,16 @@ async def start_chat(request: ChatRequest, background_tasks: BackgroundTasks):
     if not session_id:
         # Se for nova sessão, usamos as primeiras palavras como título (ou mockamos)
         title = request.message[:30] + "..." if len(request.message) > 30 else request.message
+        if not title.strip():
+            title = "Início Proativo"
         session_id = memory_service.create_session(request.ra, title=title)
+    else:
+        # Se já existe sessão e o usuário mandou texto real
+        if request.message.strip():
+            session_info = memory_service.get_session_by_id(session_id)
+            if session_info and session_info["title"] in ["", "Início Proativo", "Nova Conversa"]:
+                new_title = request.message[:30] + "..." if len(request.message) > 30 else request.message
+                memory_service.update_session_title(session_id, new_title)
         
     # Salvar a mensagem do usuário no histórico da sessão
     memory_service.add_message(session_id, "user", request.message)

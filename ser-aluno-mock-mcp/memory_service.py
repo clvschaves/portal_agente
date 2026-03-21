@@ -116,6 +116,21 @@ def get_sessions_by_ra(ra: str) -> List[Dict[str, Any]]:
         })
     return sessions
 
+def get_session_by_id(session_id: str) -> Dict[str, Any]:
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('SELECT session_id, title, created_at, updated_at FROM chat_sessions WHERE session_id = ?', (session_id,))
+        row = c.fetchone()
+        
+    if row:
+        return {
+            "session_id": row[0],
+            "title": row[1],
+            "created_at": row[2],
+            "updated_at": row[3]
+        }
+    return None
+
 def update_session_title(session_id: str, new_title: str):
     with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
         c = conn.cursor()
