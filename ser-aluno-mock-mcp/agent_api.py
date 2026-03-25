@@ -72,6 +72,20 @@ def process_agent_task(task_id: str, session_id: str, prompt: str, ra: str, coli
         
         logger.info(f"Task {task_id} concluída com sucesso.")
         
+        # Salvar o raciocínio interno (thought) para que o Streamlit exiba
+        if internal_disc:
+            reasoning_text = ""
+            for idx, d in enumerate(internal_disc):
+                content = str(d.get("content", ""))
+                # Se o conteudo tiver [MENSAGEM AO ALUNO], não colocar essa última parte do gerente no pensamento
+                if "[MENSAGEM AO ALUNO]" in content:
+                    content = content.split("[MENSAGEM AO ALUNO]")[0]
+                content = content.replace("TERMINATE", "").strip()
+                if content:
+                    reasoning_text += f"\n\n**{d.get('name', 'Agente')}**:\n{content}"
+            if reasoning_text.strip():
+                memory_service.add_message(session_id, "thought", reasoning_text.strip())
+        
         # Salva a resposta do assistente no histórico da sessão
         memory_service.add_message(session_id, "assistant", reply_text)
         

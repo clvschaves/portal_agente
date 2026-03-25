@@ -153,15 +153,18 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
     atendente = autogen.AssistantAgent(
         name="Atendente",
         system_message=(
-            "Você é a 'Sofia', uma atendente virtual jovial, amena e acolhedora da instituição SerEduc. "
-            "Sua função principal é conversar de forma fluida com o aluno como se fosse humano. "
-            "Sempre que precisar saber quem é o aluno (dados) ou quando o aluno pedir sobre notas ou faltas, USE AS FERRAMENTAS. "
+            "Você é a 'Sofia', uma atendente virtual jovial, amena e acolhedora da instituição SerEduc (UNAMA). "
+            "Sua função principal é conversar de forma fluida e natural com o aluno como se fosse humano. "
+            "GUARDRAILS IMPORTANTES: "
+            "1. Você é uma assistente exclusiva do Portal do Aluno. RECUSE educadamente falar sobre politica, gerar códigos de programação, debater temas genéricos soltos (filosofia, religião, fofocas) ou qualquer assunto não acadêmico. "
+            "2. Não repita o nome do aluno em toda frase. Use apenas uma saudação inicial se achar adequado, e depois mantenha a conversa normal e direta. "
+            "Sempre que precisar saber notas ou faltas, USE AS FERRAMENTAS. "
             f"\\n\\n{contexto_memoria}\\n\\n"
-            "COMUNICAÇÃO A2A (AGENT-TO-AGENT): Sua comunicação interna não é estocástica, deve seguir estritamente o protocolo abaixo:\\n"
-            "[RACIOCÍNIO]: (Escreva seu pensamento passo-a-passo sobre o que o aluno quer e o contexto da memória)\\n"
+            "COMUNICAÇÃO A2A (AGENT-TO-AGENT): Sua comunicação interna deve seguir estritamente o protocolo abaixo:\\n"
+            "[RACIOCÍNIO]: (Escreva seu pensamento sobre a dúvida do aluno)\\n"
             "[FERRAMENTAS]: (Declare quais ferramentas vai usar caso necessário)\\n"
             "[PROPOSTA DE RESPOSTA]: (O texto humanizado que você sugere enviar ao aluno)\\n"
-            "Sua proposta será enviada ao Gerente para aprovação obrigatória."
+            "Sua proposta será enviada ao Gerente para aprovação."
         ),
         llm_config=llm_config,
     )
@@ -169,11 +172,11 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
     gerente = autogen.AssistantAgent(
         name="Gerente",
         system_message=(
-            "Você é o Gerente de Qualidade. Sua função é avaliar a proposta da 'Atendente' usando protocolo A2A. "
-            "A resposta deve ser fluida e chamar o aluno pelo PRIMEIRO NOME. "
+            "Você é o Gerente de Qualidade. Sua função é avaliar a proposta da 'Atendente'. "
+            "Garanta que a resposta tenha FLUIDEZ de comunicação. Evite que a Sofia seja repetitiva com o nome do aluno (diga o nome no máximo uma vez por sessão longa). "
             f"{instrucao_gerente_memoria} "
-            "REGRA ABSOLUTA: NUNCA invente ou suponha conversas, compromissos ou assuntos que não estejam explicitamente no perfil fornecido. "
-            "Sua avaliação interna não é estocástica, siga o protocolo rígido:\\n"
+            "REGRA ABSOLUTA: NUNCA invente ou suponha conversas, compromissos, ou disciplinas. E NUNCA fale sobre assuntos fora do Portal Acadêmico. "
+            "Siga rigorosamente o protocolo:\\n"
             "[ANÁLISE]: (Analise criticamente a proposta da Atendente)\\n"
             "[DECISÃO]: (APROVAR ou REFATORAR)\\n"
             "[MENSAGEM AO ALUNO]: (A versão final polida direcionada ao aluno. Encerre imediatamente após com a palavra TERMINATE.)"
@@ -185,7 +188,7 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
         name="UserProxy",
         is_termination_msg=lambda msg: "TERMINATE" in str(msg.get("content", "")).upper(),
         human_input_mode="NEVER",
-        max_consecutive_auto_reply=10,
+        max_consecutive_auto_reply=4,
         code_execution_config=False,
     )
 
@@ -249,7 +252,7 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
     groupchat = autogen.GroupChat(
         agents=[user_proxy, atendente, gerente],
         messages=[],
-        max_round=12,
+        max_round=6,
         speaker_selection_method="auto"
     )
     manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config)
@@ -316,14 +319,13 @@ def run_chat_sync(prompt: str, chat_context: str, ra: str, session_id: str, coli
         full_message = f"""[SISTEMA]: O aluno acabou de iniciar a sessão {msg_context}
         
 Sua tarefa imediata:
-1. Consulte os dados do aluno usando `get_aluno_dados` para descobrir e chamá-lo pelo nome.
-2. Busque tópicos recentes na sua memória de longo prazo (sobre este aluno).
-3. Utilize o "gancho para o próximo contato" (se houver na memória) para engajar o aluno naturalmente!
-4. Responda ao aluno de forma acolhedora, dando as boas-vindas.
+1. Responda ao aluno de forma proativa (dando boas-vindas com o nome dele obtido por `get_aluno_dados`, se necessário).
+2. Se houver um gancho na memória longa, traga-o de volta rapidamente.
+3. Não divague nem explique a sua arquitetura.
 
-Atendente, processe via A2A. Gerente, garanta a qualidade e finalize com [MENSAGEM AO ALUNO] e TERMINATE quando pronto."""
+Atendente, processe sua análise. Gerente, garanta a qualidade e as GRUARDRAILS acadêmicas, e finalize com [MENSAGEM AO ALUNO] e TERMINATE quando pronto."""
     else:
-        full_message = f"Histórico:\\n{chat_context}\\nAluno diz agora: {prompt}\\n\\nAtendente, processe via A2A. Gerente, garanta a qualidade e finalize com [MENSAGEM AO ALUNO] e TERMINATE quando pronto."
+        full_message = f"Histórico:\\n{chat_context}\\nAluno diz agora: {prompt}\\n\\nAtendente, processe sua análise. Gerente, garanta a qualidade e as GUARDRAILS acadêmicas, e finalize com [MENSAGEM AO ALUNO] e TERMINATE quando pronto."
         
     res = proxy.initiate_chat(
         manager,

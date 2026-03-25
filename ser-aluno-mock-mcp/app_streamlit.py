@@ -65,10 +65,14 @@ with st.sidebar:
 
 # Renderiza histórico
 for msg in st.session_state.messages:
-    role = "assistant" if msg["role"] == "assistant" else "user"
-    if msg["content"].strip():
-        with st.chat_message(role):
+    if msg["role"] == "thought":
+        with st.expander("🧐 Raciocínio Interno da IA"):
             st.markdown(msg["content"])
+    else:
+        role = "assistant" if msg["role"] == "assistant" else "user"
+        if msg["content"].strip():
+            with st.chat_message(role):
+                st.markdown(msg["content"])
 
 # Callback de chat
 prompt = st.chat_input("Ex: 'Estou com medo das minhas faltas...'")
