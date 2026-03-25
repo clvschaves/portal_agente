@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import memory_service  # To initialize DB
+from api.services import memory_service  # To initialize DB
 from .routers import chat
 
 # Inicializar Banco de Memória SQLite

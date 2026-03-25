@@ -12,9 +12,9 @@ import threading
 import asyncio
 from dotenv import load_dotenv
 
-# Assuming memory_service is accessible from the project root
-import memory_service
-import vector_memory_service
+# Assuming memory_service is accessible from the api.services package
+from api.services import memory_service
+from api.services import vector_memory_service
 
 # Carrega variáveis de ambiente do arquivo .env (se existir)
 load_dotenv()

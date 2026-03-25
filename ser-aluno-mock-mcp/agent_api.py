@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from api.services.agent_service import run_chat_sync
-import memory_service
+from api.services import memory_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AgentAPI")
