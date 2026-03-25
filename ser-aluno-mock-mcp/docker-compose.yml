@@ -63,6 +63,9 @@ services:
       KEYCLOAK_REALM: sereduc-mcps
       KEYCLOAK_CLIENT_ID: ser-mcp-client
       DATABASE_FILE: database.json
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
       - "8081:8081"
     depends_on:
@@ -81,9 +84,31 @@ services:
       retries: 3
       start_period: 60s
 
+  # Banco Vetorial ChromaDB (Escalonável Client/Server)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ser-aluno-chromadb
+    ports:
+      - "8002:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=False
+    volumes:
+      - chroma_db_data:/chroma/chroma
+    networks:
+      - mock-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
 networks:
   mock-network:
     driver: bridge
 
 volumes:
   keycloak_db_data:
+  chroma_db_data:

@@ -12,20 +12,25 @@ logger = logging.getLogger("VectorMemoryService")
 CHROMA_DB_DIR = os.path.join(os.path.dirname(__file__), "chroma_data")
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
-# Initialize ChromaDB persistent client
-client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+# Initialize ChromaDB HTTP client (Client/Server Architecture)
+chroma_host = os.environ.get("CHROMA_HOST", "localhost")
+chroma_port = int(os.environ.get("CHROMA_PORT", 8002))
+
+logger.info(f"Conectando ao banco vetorial ChromaDB em {chroma_host}:{chroma_port}...")
+client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
 
 # Setting up OpenAI embedding function using the key
 _openai_key = os.environ.get("OPENAI_API_KEY", "")
-if _openai_key:
-    # Use high-quality embeddings from OpenAI
-    embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
-        api_key=_openai_key,
-        model_name="text-embedding-3-small"
-    )
-else:
-    # Fallback to local sentence-transformers (might take time to download if first run)
-    embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+
+# Use high-quality embeddings from OpenAI (Obrigatório em produção p/ poupar CPU)
+if not _openai_key:
+    logger.error("ERRO CRUCIAL: OPENAI_API_KEY não foi encontrada. Embeddings locais derrubariam o servidor na escala de 350k. Adicione a key no .env.")
+    raise ValueError("OPENAI_API_KEY é obrigatória para gerar embeddings em produção.")
+
+embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+    api_key=_openai_key,
+    model_name="text-embedding-3-small"
+)
 
 # Create or get the collection
 collection_name = "aluno_memories"
