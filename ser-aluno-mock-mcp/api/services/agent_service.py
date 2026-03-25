@@ -1,5 +1,9 @@
 import os
 import json
+from pathlib import Path
+
+# Directory where prompts are stored
+PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 import requests
 import autogen
 import logging
@@ -150,37 +154,22 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
             "Se houver um [GANCHO PARA O PRÓXIMO CONTATO] no perfil, use-o naturalmente na conversa."
         )
 
+        # Carregar prompts externos (Protocolo N2N)
+    with open(PROMPTS_DIR / "atendente.md", "r", encoding="utf-8") as f:
+        atendente_prompt_template = f.read()
+    
+    with open(PROMPTS_DIR / "gerente.md", "r", encoding="utf-8") as f:
+        gerente_prompt_template = f.read()
+
     atendente = autogen.AssistantAgent(
         name="Atendente",
-        system_message=(
-            "Você é a 'Sofia', uma atendente virtual jovial, amena e acolhedora da instituição SerEduc (UNAMA). "
-            "Sua função principal é conversar de forma fluida e natural com o aluno como se fosse humano. "
-            "GUARDRAILS IMPORTANTES: "
-            "1. Você é uma assistente exclusiva do Portal do Aluno. RECUSE educadamente falar sobre politica, gerar códigos de programação, debater temas genéricos soltos (filosofia, religião, fofocas) ou qualquer assunto não acadêmico. "
-            "2. Não repita o nome do aluno em toda frase. Use apenas uma saudação inicial se achar adequado, e depois mantenha a conversa normal e direta. "
-            "Sempre que precisar saber notas ou faltas, USE AS FERRAMENTAS. "
-            f"\\n\\n{contexto_memoria}\\n\\n"
-            "COMUNICAÇÃO A2A (AGENT-TO-AGENT): Sua comunicação interna deve seguir estritamente o protocolo abaixo:\\n"
-            "[RACIOCÍNIO]: (Escreva seu pensamento sobre a dúvida do aluno)\\n"
-            "[FERRAMENTAS]: (Declare quais ferramentas vai usar caso necessário)\\n"
-            "[PROPOSTA DE RESPOSTA]: (O texto humanizado que você sugere enviar ao aluno)\\n"
-            "Sua proposta será enviada ao Gerente para aprovação."
-        ),
+        system_message=atendente_prompt_template.format(contexto_memoria=contexto_memoria),
         llm_config=llm_config,
     )
 
     gerente = autogen.AssistantAgent(
         name="Gerente",
-        system_message=(
-            "Você é o Gerente de Qualidade. Sua função é avaliar a proposta da 'Atendente'. "
-            "Garanta que a resposta tenha FLUIDEZ de comunicação. Evite que a Sofia seja repetitiva com o nome do aluno (diga o nome no máximo uma vez por sessão longa). "
-            f"{instrucao_gerente_memoria} "
-            "REGRA ABSOLUTA: NUNCA invente ou suponha conversas, compromissos, ou disciplinas. E NUNCA fale sobre assuntos fora do Portal Acadêmico. "
-            "Siga rigorosamente o protocolo:\\n"
-            "[ANÁLISE]: (Analise criticamente a proposta da Atendente)\\n"
-            "[DECISÃO]: (APROVAR ou REFATORAR)\\n"
-            "[MENSAGEM AO ALUNO]: (A versão final polida direcionada ao aluno. Encerre imediatamente após com a palavra TERMINATE.)"
-        ),
+        system_message=gerente_prompt_template.format(instrucao_gerente_memoria=instrucao_gerente_memoria),
         llm_config=llm_config_mini,
     )
 

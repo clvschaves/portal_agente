@@ -2,6 +2,10 @@ import sqlite3
 import autogen
 import logging
 from typing import List, Dict, Any
+from pathlib import Path
+
+# Configuração do caminho dos prompts
+PROMPTS_DIR = Path(__file__).parent / "api" / "prompts"
 
 # Configure logger
 logging.basicConfig(level=logging.INFO)
@@ -201,18 +205,10 @@ def update_profile_with_llm(ra: str, chat_history: str, config_list: List[Dict[s
         code_execution_config=False
     )
     
-    prompt = f"""
-    [PERFIL ATUAL DO ALUNO (RA: {ra})]
-    {old_profile}
-    
-    [NOVA INTERAÇÃO / HISTÓRICO RECENTE]
-    {chat_history}
-    
-    Sua tarefa: Reescreva o perfil do aluno de forma clara. 
-    1. Atualize as dores principais, sentimentos demonstrados, características marcantes e estilo de conversa. 
-    2. CRIE UMA SEÇÃO OBRIGATÓRIA chamada [GANCHO PARA O PRÓXIMO CONTATO], com uma sugestão EXATA do que a Atendente deve perguntar ou comentar da próxima vez que ele logar (ex: "Perguntar se a crise de ansiedade com matemática passou").
-    Lembre-se de manter o histórico consolidado. Retorne SOMENTE o texto do novo dossiê.
-    """
+    with open(PROMPTS_DIR / "analista.md", "r", encoding="utf-8") as f:
+        analista_prompt_template = f.read()
+        
+    prompt = analista_prompt_template.format(ra=ra, old_profile=old_profile, chat_history=chat_history)
     
     try:
         logger.info(f"[Memória] Iniciando profiling via LLM para {ra}...")
