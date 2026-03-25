@@ -104,6 +104,38 @@ services:
       timeout: 5s
       retries: 5
 
+  agent-api:
+    build: .
+    container_name: agent-api
+    command: uvicorn agent_api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - MCP_URL=http://ser-aluno-mock-mcp:8081/mcp
+      - DB_PATH=/app/data/aluno_memory.db
+    networks:
+      - mock-network
+    volumes:
+      - agent_api_sqlite:/app/data
+    depends_on:
+      - ser-aluno-mock-mcp
+      - chromadb
+
+  streamlit-ui:
+    build: .
+    container_name: streamlit-ui
+    command: streamlit run app_streamlit.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://agent-api:8000
+    networks:
+      - mock-network
+    depends_on:
+      - agent-api
 
 networks:
   mock-network:
@@ -112,3 +144,4 @@ networks:
 volumes:
   keycloak_db_data:
   chroma_db_data:
+  agent_api_sqlite:

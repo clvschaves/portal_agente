@@ -3,6 +3,7 @@ import autogen
 import logging
 from typing import List, Dict, Any
 from pathlib import Path
+import os
 
 # Configuração do caminho dos prompts
 PROMPTS_DIR = Path(__file__).parent / "api" / "prompts"
@@ -11,7 +12,7 @@ PROMPTS_DIR = Path(__file__).parent / "api" / "prompts"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MemoryService")
 
-DB_PATH = 'aluno_memory.db'
+DB_PATH = os.environ.get("DB_PATH", 'aluno_memory.db')
 
 def init_db():
     with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
