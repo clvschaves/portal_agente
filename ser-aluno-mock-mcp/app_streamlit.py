@@ -1,8 +1,9 @@
 import streamlit as st
 import requests
 import time
+import os
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.environ.get("API_URL", "http://agent-api:8000")
 
 st.set_page_config(page_title="Sofia 🎓", page_icon="🎓")
 
