@@ -6,7 +6,7 @@ from pathlib import Path
 import os
 
 # Configuração do caminho dos prompts
-PROMPTS_DIR = Path(__file__).parent / "api" / "prompts"
+PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 # Configure logger
 logging.basicConfig(level=logging.INFO)

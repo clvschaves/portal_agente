@@ -114,7 +114,12 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
-      - MCP_URL=http://ser-aluno-mock-mcp:8081/mcp
+      - MCP_URL=${MCP_URL}
+      - KEYCLOAK_URL=${KEYCLOAK_URL}
+      - REALM=${REALM}
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - DEV_MODE=${DEV_MODE}
       - DB_PATH=/app/data/aluno_memory.db
     networks:
       - mock-network
