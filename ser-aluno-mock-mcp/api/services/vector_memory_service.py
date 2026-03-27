@@ -17,31 +17,32 @@ chroma_host = os.environ.get("CHROMA_HOST", "localhost")
 chroma_port = int(os.environ.get("CHROMA_PORT", 8002))
 
 logger.info(f"Conectando ao banco vetorial ChromaDB em {chroma_host}:{chroma_port}...")
-client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
-
-# Setting up OpenAI embedding function using the key
-_openai_key = os.environ.get("OPENAI_API_KEY", "")
-
-# Use high-quality embeddings from OpenAI (Obrigatório em produção p/ poupar CPU)
-if not _openai_key:
-    logger.error("ERRO CRUCIAL: OPENAI_API_KEY não foi encontrada. Embeddings locais derrubariam o servidor na escala de 350k. Adicione a key no .env.")
-    raise ValueError("OPENAI_API_KEY é obrigatória para gerar embeddings em produção.")
-
-embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=_openai_key,
-    model_name="text-embedding-3-small"
-)
-
-# Create or get the collection
-collection_name = "aluno_memories"
 try:
+    client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+
+    # Setting up OpenAI embedding function using the key
+    _openai_key = os.environ.get("OPENAI_API_KEY", "")
+
+    # Use high-quality embeddings from OpenAI (Obrigatório em produção p/ poupar CPU)
+    if not _openai_key:
+        logger.error("ERRO CRUCIAL: OPENAI_API_KEY não foi encontrada. Embeddings locais derrubariam o servidor na escala de 350k. Adicione a key no .env.")
+        raise ValueError("OPENAI_API_KEY é obrigatória para gerar embeddings em produção.")
+
+    embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+        api_key=_openai_key,
+        model_name="text-embedding-3-small"
+    )
+
+    # Create or get the collection
+    collection_name = "aluno_memories"
     memory_collection = client.get_or_create_collection(
         name=collection_name,
         embedding_function=embedding_fn,
         metadata={"hnsw:space": "cosine"}
     )
 except Exception as e:
-    logger.error(f"Erro ao inicializar coleção ChromaDB: {e}")
+    logger.error(f"Erro ao inicializar ChromaDB: {e}. Desativando memória vetorial.")
+    client = None
     memory_collection = None
 
 def store_memory(ra: str, session_id: str, role: str, text: str):

@@ -2,12 +2,20 @@ import os
 import sys
 import uuid
 import logging
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from dotenv import load_dotenv
+
+# Carrega variáveis de ambiente imediatamente no início
+load_dotenv(os.path.join(os.getcwd(), ".env"))
+
+import asyncio
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-# Ensure the local path is reachable
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Adapts the path for imports
+sys.path.append(os.getcwd())
 
 from api.services.agent_service import run_chat_sync
 from api.services import memory_service
