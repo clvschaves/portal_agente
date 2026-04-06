@@ -1,0 +1,20 @@
+#!/usr/bin/expect -f
+set timeout 60
+set host "192.168.40.33"
+set port "2222"
+set user "biserdados"
+set password "YLU3HZKXN5LPZLQZALU3"
+
+spawn ssh -o StrictHostKeyChecking=no -p $port $user@$host
+expect {
+    "yes/no" { send "yes\r"; exp_continue }
+    "password:" { send "$password\r" }
+}
+
+expect "*$ "
+send "ls -la portal_agente/ser-aluno-mock-mcp\r"
+expect "*$ "
+send "echo $password | sudo -S docker ps\r"
+expect "*$ "
+send "exit\r"
+expect eof

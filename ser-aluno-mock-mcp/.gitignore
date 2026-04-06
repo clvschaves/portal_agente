@@ -58,6 +58,8 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+deploy_*.exp
+deploy_*.sh
 
 # Runtime / Data files  (não versionar dados gerados em runtime)
 *.db

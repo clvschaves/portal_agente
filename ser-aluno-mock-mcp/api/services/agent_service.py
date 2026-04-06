@@ -249,8 +249,37 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
     return manager, user_proxy
 
 
+def parse_message_for_user(content: str) -> str:
+    """Extrai apenas a parte destinada ao aluno de um texto completo."""
+    if not content:
+        return ""
+    if "[MENSAGEM AO ALUNO]" in content:
+        parts = content.split("[MENSAGEM AO ALUNO]")
+        text = parts[-1].strip()
+        text = text.lstrip(":")
+        text = text.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
+        return text
+    if "[DECISÃO]" in content:
+        parts = content.split("[DECISÃO]")
+        text_after = parts[-1].strip()
+        if "\\n" in text_after:
+            text_after = text_after.split("\\n", 1)[1].strip()
+        else:
+            text_after = text_after.replace("APROVAR", "").replace("REFATORAR", "").strip()
+        text_after = text_after.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
+        return text_after
+    
+    if "[PROPOSTA DE RESPOSTA]" in content:
+        parts = content.split("[PROPOSTA DE RESPOSTA]")
+        text = parts[-1].strip()
+        text = text.lstrip(":")
+        text = text.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
+        return text
+        
+    return ""
+
+
 def extract_final_message(chat_history):
-    reply_text = ""
     if not chat_history:
         return ""
         
@@ -258,36 +287,15 @@ def extract_final_message(chat_history):
         content = str(msg.get("content", ""))
         name = msg.get("name", "")
         
-        if name == "Gerente":
-            if "[MENSAGEM AO ALUNO]" in content:
-                parts = content.split("[MENSAGEM AO ALUNO]")
-                text = parts[-1].strip()
-                text = text.lstrip(":")
-                reply_text = text.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
-                if reply_text: return reply_text
+        parsed = parse_message_for_user(content)
+        if parsed:
+            return parsed
             
-            if "[DECISÃO]" in content:
-                parts = content.split("[DECISÃO]")
-                text_after_decisao = parts[-1].strip()
-                if "\\n" in text_after_decisao:
-                    text_after_decisao = text_after_decisao.split("\\n", 1)[1].strip()
-                else:
-                    text_after_decisao = text_after_decisao.replace("APROVAR", "").replace("REFATORAR", "").strip()
-                reply_text = text_after_decisao.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
-                if reply_text: return reply_text
-                
-            if "TERMINATE" in content:
-                reply_text = content.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
-                if reply_text: return reply_text
-
-        if name == "Atendente" and "[PROPOSTA DE RESPOSTA]" in content and not reply_text:
-            parts = content.split("[PROPOSTA DE RESPOSTA]")
-            text = parts[-1].strip()
-            text = text.lstrip(":")
-            reply_text = text.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
-            if reply_text: return reply_text
-            
-    return reply_text
+        if name == "Gerente" and "TERMINATE" in content:
+             reply_text = content.replace("TERMINATE.", "").replace("TERMINATE", "").strip()
+             if reply_text: return reply_text
+             
+    return ""
 
 
 def run_chat_sync(prompt: str, chat_context: str, ra: str, session_id: str, coligada: int, habilitacao: int, is_initial: bool = False):
@@ -333,7 +341,11 @@ Atendente, processe sua análise. Gerente, garanta a qualidade e as GRUARDRAILS 
     if not reply_text:
         summary_raw = getattr(res, "summary", "")
         if summary_raw:
-            reply_text = str(summary_raw).replace("TERMINATE", "").strip()
+            parsed = parse_message_for_user(str(summary_raw))
+            if parsed:
+                reply_text = parsed
+            else:
+                reply_text = str(summary_raw).replace("TERMINATE", "").strip()
 
     if not reply_text and is_initial:
         reply_text = "Olá! Como posso te ajudar hoje?"
