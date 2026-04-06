@@ -15,11 +15,6 @@ services:
       - chroma_db_data:/chroma/chroma
     networks:
       - mock-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   agent-api:
     build: .
@@ -43,8 +38,7 @@ services:
     volumes:
       - agent_api_sqlite:/app/data
     depends_on:
-      chromadb:
-        condition: service_healthy
+      - chromadb
 
   streamlit-ui:
     build: .
