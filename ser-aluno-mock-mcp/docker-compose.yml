@@ -43,7 +43,7 @@ services:
   streamlit-ui:
     build: .
     container_name: streamlit-ui
-    command: streamlit run app_streamlit.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
+    command: streamlit run app_streamlit.py
     ports:
       - "8501:8501"
     environment:
