@@ -182,35 +182,65 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
     )
 
     def get_aluno_dados() -> str:
+        cache_key = f"aluno_dados_{ra}_{coligada}"
+        cached = memory_service.get_mcp_cache(cache_key)
+        if cached:
+            logger.info(f"Retornando dados do cache local (N2N) para ch: {cache_key}")
+            return cached
+            
         try:
             res = call_mcp("resources/read", {
                 "uri": "aluno:dados",
                 "arguments": {"codColigada": coligada, "ra": ra}
             })
             contents = res.get("result", {}).get("contents", [])
-            return contents[0].get("text", "Nenhum dado encontrado") if contents else "Nenhum dado encontrado"
+            text_res = contents[0].get("text", "Nenhum dado encontrado") if contents else "Nenhum dado encontrado"
+            if text_res != "Nenhum dado encontrado":
+                memory_service.set_mcp_cache(cache_key, text_res, ttl_hours=2)
+            return text_res
         except Exception as e:
             logger.error(f"Erro ao consultar dados pessoais no MCP: {e}", exc_info=True)
             return "Erro técnico: Não foi possível obter os dados do aluno no momento."
 
-    def get_aluno_disciplinas() -> str:
+    def get_aluno_disciplinas(periodo_letivo: str = None) -> str:
+        cache_key = f"aluno_disciplinas_{ra}_{coligada}_{habilitacao}_{periodo_letivo}"
+        cached = memory_service.get_mcp_cache(cache_key)
+        if cached:
+            logger.info(f"Retornando disciplinas do cache local (N2N) para ch: {cache_key}")
+            return cached
+            
         try:
+            arguments = {
+                "ra": ra,
+                "idHabilitacaoFilial": habilitacao,
+                "codColigada": coligada,
+                "retornarNotasFaltas": True
+            }
+            if periodo_letivo:
+                # Normalize period format (e.g. "2024.1" -> "20241")
+                normalized_per_let = str(periodo_letivo).replace(".", "").replace(" ", "").replace("-", "")
+                arguments["codPerLet"] = normalized_per_let
+
             res = call_mcp("resources/read", {
                 "uri": "aluno:disciplinas",
-                "arguments": {
-                    "ra": ra,
-                    "idHabilitacaoFilial": habilitacao,
-                    "codColigada": coligada,
-                    "retornarNotasFaltas": True
-                }
+                "arguments": arguments
             })
             contents = res.get("result", {}).get("contents", [])
-            return contents[0].get("text", "Nenhuma disciplina encontrada") if contents else "Nenhuma disciplina encontrada"
+            text_res = contents[0].get("text", "Nenhuma disciplina encontrada") if contents else "Nenhuma disciplina encontrada"
+            if text_res != "Nenhuma disciplina encontrada":
+                memory_service.set_mcp_cache(cache_key, text_res, ttl_hours=2)
+            return text_res
         except Exception as e:
             logger.error(f"Erro ao consultar disciplinas no MCP: {e}", exc_info=True)
             return "Erro técnico: Não foi possível obter as disciplinas/notas do aluno no momento."
 
     def get_aluno_summary() -> str:
+        cache_key = f"aluno_summary_{ra}_{coligada}_{habilitacao}"
+        cached = memory_service.get_mcp_cache(cache_key)
+        if cached:
+            logger.info(f"Retornando resumo acadêmico do cache local (N2N) para ch: {cache_key}")
+            return cached
+            
         try:
             res = call_mcp("tools/call", {
                 "name": "get_aluno_summary",
@@ -222,7 +252,10 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
                 }
             })
             contents = res.get("result", {}).get("content", [])
-            return contents[0].get("text", "Nenhum resumo encontrado") if contents else "Nenhum resumo encontrado"
+            text_res = contents[0].get("text", "Nenhum resumo encontrado") if contents else "Nenhum resumo encontrado"
+            if text_res != "Nenhum resumo encontrado":
+                memory_service.set_mcp_cache(cache_key, text_res, ttl_hours=4) # Resumo muda menos, 4h
+            return text_res
         except Exception as e:
             logger.error(f"Erro ao consultar resumo academico no MCP: {e}", exc_info=True)
             return "Erro técnico: Não foi possível obter o resumo do aluno no momento."
@@ -232,10 +265,10 @@ def init_autogen(ra: str, semantic_memory: str, coligada: int, habilitacao: int)
         get_aluno_dados, caller=atendente, executor=user_proxy, name="get_aluno_dados", description="Obtém os dados pessoais básicos do aluno autenticado (telefone, email, endereço)."
     )
     autogen.agentchat.register_function(
-        get_aluno_disciplinas, caller=atendente, executor=user_proxy, name="get_aluno_disciplinas", description="Obtém as disciplinas do aluno atual no semestre. INCLUI INFORMAÇÕES CRÍTICAS SOBRE SUAS NOTAS E FALTAS atuais."
+        get_aluno_disciplinas, caller=atendente, executor=user_proxy, name="get_aluno_disciplinas", description="Obtém as disciplinas do aluno atual, incluindo INFORMAÇÕES CRÍTICAS SOBRE SUAS NOTAS E FALTAS atuais. Aceita o parâmetro opcional 'periodo_letivo' que deve ser sempre solicitado ao aluno."
     )
     autogen.agentchat.register_function(
-        get_aluno_summary, caller=atendente, executor=user_proxy, name="get_aluno_summary", description="Obtém o resumo acadêmico inteiro do aluno autenticado, com cursos e quantidade de disciplinas matriculadas."
+        get_aluno_summary, caller=atendente, executor=user_proxy, name="get_aluno_summary", description="Obtém o resumo acadêmico inteiro do aluno autenticado, com cursos e quantidade total de disciplinas matriculadas em todos os períodos."
     )
 
     groupchat = autogen.GroupChat(
