@@ -5,6 +5,7 @@ services:
   chromadb:
     image: chromadb/chroma:latest
     container_name: ser-aluno-chromadb
+    restart: unless-stopped
     ports:
       - "8002:8000"
     environment:
@@ -19,7 +20,8 @@ services:
   agent-api:
     build: .
     container_name: agent-api
-    command: uvicorn agent_api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    command: uvicorn agent_api:app --host 0.0.0.0 --port 8000 --log-level info
     ports:
       - "8001:8000"
     environment:
@@ -33,6 +35,7 @@ services:
       - CLIENT_SECRET=${CLIENT_SECRET}
       - DEV_MODE=${DEV_MODE}
       - DB_PATH=/app/data/aluno_memory.db
+      - PYTHONUNBUFFERED=1
     networks:
       - mock-network
     volumes:
@@ -43,11 +46,13 @@ services:
   streamlit-ui:
     build: .
     container_name: streamlit-ui
+    restart: unless-stopped
     command: streamlit run app_streamlit.py
     ports:
       - "8501:8501"
     environment:
       - API_URL=http://agent-api:8000
+      - PYTHONUNBUFFERED=1
     networks:
       - mock-network
     depends_on:
