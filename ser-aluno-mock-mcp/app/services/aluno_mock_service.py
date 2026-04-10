@@ -88,60 +88,70 @@ class AlunoMockService:
         retornar_notas_faltas: bool = False,
         id_turma_disc: Optional[int] = None
     ) -> List[DisciplinaDto]:
-        """Get aluno disciplinas matriculadas."""
+        """Get aluno disciplinas matriculadas (legado — mantido para compatibilidade)."""
+        return await self.get_aluno_disciplinas_full(
+            ra=ra,
+            id_habilitacao_filial=id_habilitacao_filial,
+            cod_coligada=cod_coligada,
+            id_per_let=id_per_let,
+            cod_per_let=cod_per_let,
+            cod_status=cod_status,
+            status=status,
+            id_turma_disc=id_turma_disc,
+        )
+
+    async def get_aluno_disciplinas_full(
+        self,
+        ra: str,
+        id_habilitacao_filial: int,
+        cod_coligada: int,
+        id_per_let: Optional[int] = None,
+        cod_per_let: Optional[str] = None,
+        cod_status: Optional[int] = None,
+        status: Optional[str] = None,
+        id_turma_disc: Optional[int] = None
+    ) -> List[DisciplinaDto]:
+        """Retorna disciplinas com TODOS os campos (notas + faltas).
+        
+        A filtragem do que expor ao cliente (matrícula pura / notas / faltas)
+        é responsabilidade do ResourceHandler de acordo com a rota chamada.
+        """
         try:
-            logger.info(f"Getting aluno disciplinas for RA: {ra}, idHabilitacaoFilial: {id_habilitacao_filial}")
-            
+            logger.info(
+                f"Getting aluno disciplinas para RA: {ra}, "
+                f"idHabilitacaoFilial: {id_habilitacao_filial}, codPerLet: {cod_per_let}"
+            )
+
             disciplinas = []
             for disciplina in self._data.get("disciplinas", []):
-                # Filter by required parameters
-                if (disciplina["RA"] != ra or 
-                    disciplina["IDHABILITACAOFILIAL"] != id_habilitacao_filial or
-                    disciplina["CODCOLIGADA"] != cod_coligada):
+                if (disciplina["RA"] != ra
+                        or disciplina["IDHABILITACAOFILIAL"] != id_habilitacao_filial
+                        or disciplina["CODCOLIGADA"] != cod_coligada):
                     continue
-                
-                # Apply optional filters
+
                 if id_per_let is not None and disciplina.get("IDPERLET") != id_per_let:
                     continue
-                
+
                 if cod_per_let is not None and disciplina.get("CODPERLET") != cod_per_let:
                     continue
-                
+
                 if cod_status is not None and disciplina.get("CODSTATUS") != cod_status:
                     continue
-                
+
                 if status is not None and disciplina.get("NOMESTATUS") != status:
                     continue
-                
+
                 if id_turma_disc is not None and disciplina.get("IDTURMADISC") != id_turma_disc:
                     continue
-                
-                # If retornar_notas_faltas is False, remove detailed grade fields
-                if not retornar_notas_faltas:
-                    disciplina_copy = disciplina.copy()
-                    # Remove detailed fields
-                    fields_to_remove = [
-                        "NOTAV1", "NOTAV2", "NOTAFINAL", "MEDIAALUNO", "MEDIATURMAV1", "MEDIATURMAV2",
-                        "MEDIATURMAFINAL", "MEDIATURMA", "DATAAV1", "DATAAV2", "DATAAVFINAL",
-                        "FALTASCOMETIDAS", "MAXIMOFALTASDISCIPLINA", "MEDIAFALTASTURMA",
-                        "CHPRATICA", "CHTEORICA", "TIPOTURMA", "CODTURMAUBIQUA", "DATAINICIOAULA",
-                        "DATAFIMAULA", "DESCRICAORES", "DATA2CH", "MEDIAGERAL", "MEDIAAV1",
-                        "MEDIAAV2", "MEDIAFINAL"
-                    ]
-                    for field in fields_to_remove:
-                        disciplina_copy.pop(field, None)
-                    
-                    disciplina_dto = DisciplinaDto(**disciplina_copy)
-                else:
-                    disciplina_dto = DisciplinaDto(**disciplina)
-                
+
+                disciplina_dto = DisciplinaDto(**disciplina)
                 disciplinas.append(disciplina_dto)
-            
-            logger.info(f"Found {len(disciplinas)} disciplinas for RA: {ra}")
+
+            logger.info(f"Encontradas {len(disciplinas)} disciplinas para RA: {ra}")
             return disciplinas
-            
+
         except Exception as e:
-            logger.error(f"Error getting aluno disciplinas: {e}", exc_info=True)
+            logger.error(f"Erro ao buscar disciplinas: {e}", exc_info=True)
             return []
     
     async def get_aluno_dados_escolares(self, ra: str) -> Optional[AlunoDadosEscolaresDto]:
