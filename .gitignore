@@ -68,17 +68,10 @@ node_modules/
 # ================================
 # SER-ALUNO-MOCK-MCP / GIT RULES
 # ================================
-# Ignorar arquivos de testes
+# Ignorar arquivos de testes e scripts de deploy locais
 test_*.py
 *test*.sh
 test-*.py
 tests/
-
-# Ignorar aplicativo MCP Mock (iremos manter apenas os agentes)
-ser-aluno-mock-mcp/app/
-ser-aluno-mock-mcp/main.py
 ser-aluno-mock-mcp/server_test_local.py
-ser-aluno-mock-mcp/database.json
-ser-aluno-mock-mcp/docker-compose.yml
-ser-aluno-mock-mcp/Dockerfile
 ser-aluno-mock-mcp/student_support_agent.py
