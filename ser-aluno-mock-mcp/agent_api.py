@@ -54,13 +54,19 @@ def process_agent_task(task_id: str, session_id: str, prompt: str, ra: str, coli
         
         # Puxa histórico de curto prazo (sessão)
         messages_db = memory_service.get_session_messages(session_id)
+        
+        # Preserva a contagem total para a lógica original de is_initial
+        user_msg_count = sum(1 for m in messages_db if m["role"] == "user")
+        
+        # APLICAÇÃO DA JANELA DESLIZANTE (Sliding Window)
+        # Limita o buffer para as últimas 20 mensagens, evitando estouro de contexto de 128k tokens
+        max_history = 20
+        sliced_messages = messages_db[-max_history:] if len(messages_db) > max_history else messages_db
+        
         chat_context = ""
-        user_msg_count = 0
-        for m in messages_db:
+        for m in sliced_messages:
             role_name = "Aluno" if m["role"] == "user" else "Sofia"
             chat_context += f"[{m['created_at']}] {role_name}: {m['content']}\n"
-            if m["role"] == "user":
-                user_msg_count += 1
             
         if not chat_context:
             chat_context = "Nenhuma mensagem anterior nesta sessão."

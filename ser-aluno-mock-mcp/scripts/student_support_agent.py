@@ -80,22 +80,28 @@ def get_aluno_dados() -> str:
     except Exception as e:
         return f"Erro ao consultar dados: {str(e)}"
 
-def get_aluno_disciplinas() -> str:
+def get_aluno_disciplinas(periodo_letivo: str = None) -> str:
     """Obtém as disciplinas do aluno incluindo notas e faltas."""
     try:
+        arguments = {
+            "ra": RA,
+            "idHabilitacaoFilial": HABILITACAO,
+            "codColigada": COLIGADA,
+            "retornarNotasFaltas": True
+        }
+        if periodo_letivo:
+            # Normalize period format (e.g. "2024.1" -> "20241")
+            normalized_per_let = str(periodo_letivo).replace(".", "").replace(" ", "").replace("-", "")
+            arguments["codPerLet"] = normalized_per_let
+
         res = call_mcp("resources/read", {
             "uri": "aluno:disciplinas",
-            "arguments": {
-                "ra": RA,
-                "idHabilitacaoFilial": HABILITACAO,
-                "codColigada": COLIGADA,
-                "retornarNotasFaltas": True
-            }
+            "arguments": arguments
         })
         contents = res.get("result", {}).get("contents", [])
         return contents[0].get("text", "Nenhuma disciplina encontrada") if contents else "Nenhuma disciplina encontrada"
     except Exception as e:
-        return f"Erro ao consultar disciplinas: {str(e)}"
+        return f"Erro ao consultar disciplinas: {e}"
 
 def get_aluno_summary() -> str:
     """Obtém um sumário geral do aluno (dados pessoais, cursos, disciplinas totais)."""
@@ -129,8 +135,8 @@ def build_agent() -> autogen.AssistantAgent:
         "pratique reforço positivo para notas boas e reenquadramento (reframing) positivo para notas não tão boas ou faltas altas, "
         "incentivando-o a não desistir e oferecendo suporte. Respire fundo e dê respostas curtas e claras. "
         "Você tem acesso a recursos para checar os dados do aluno cadastrado, suas disciplinas, notas e faltas, e um resumo geral. "
-        "Se perguntarem notas ou faltas, utilize as ferramentas disponíveis chamando 'get_aluno_disciplinas' ou 'get_aluno_summary' "
-        "para consultar as informações no sistema antes de responder."
+        "Se perguntarem notas ou faltas, PRIMEIRO pergunte qual o período letivo (semestre) desejado, caso não tenham informado. "
+        "Somente depois utilize a ferramenta 'get_aluno_disciplinas' passando o período letivo para consultar as informações."
     )
 
     support_agent = autogen.AssistantAgent(
@@ -158,10 +164,10 @@ def main():
         get_aluno_dados, caller=support_agent, executor=user_proxy, name="get_aluno_dados", description="Obtém os dados pessoais básicos do aluno autenticado (telefone, email, endereço)."
     )
     autogen.agentchat.register_function(
-        get_aluno_disciplinas, caller=support_agent, executor=user_proxy, name="get_aluno_disciplinas", description="Obtém as disciplinas do aluno atual no semestre. INCLUI INFORMAÇÕES CRÍTICAS SOBRE SUAS NOTAS E FALTAS atuais."
+        get_aluno_disciplinas, caller=support_agent, executor=user_proxy, name="get_aluno_disciplinas", description="Obtém as disciplinas do aluno atual. INCLUI INFORMAÇÕES CRÍTICAS SOBRE SUAS NOTAS E FALTAS atuais. Aceita o parâmetro opcional 'periodo_letivo' que deve ser sempre solicitado ao aluno."
     )
     autogen.agentchat.register_function(
-        get_aluno_summary, caller=support_agent, executor=user_proxy, name="get_aluno_summary", description="Obtém o resumo acadêmico inteiro do aluno autenticado, com cursos e quantidade de disciplinas matriculadas."
+        get_aluno_summary, caller=support_agent, executor=user_proxy, name="get_aluno_summary", description="Obtém o resumo acadêmico inteiro do aluno autenticado, com cursos e quantidade total de disciplinas matriculadas em todos os semestres."
     )
 
     print("Iniciando chat com o suporte...")
@@ -169,7 +175,7 @@ def main():
     # Test message queries:
     chat_result = user_proxy.initiate_chat(
         support_agent,
-        message="Oi, tô super preocupado. Quais são as minhas notas e faltas nesse semestre? Não sei se vou passar...",
+        message="Oi, preciso ver minhas notas do período letivo 2026.1, por favor.",
         summary_method="last_msg"
     )
     

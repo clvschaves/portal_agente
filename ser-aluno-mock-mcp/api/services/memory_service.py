@@ -51,6 +51,13 @@ def init_db():
                 FOREIGN KEY(session_id) REFERENCES chat_sessions(session_id)
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS mcp_cache (
+                cache_key TEXT PRIMARY KEY,
+                payload TEXT,
+                expires_at TIMESTAMP
+            )
+        ''')
         conn.commit()
 
 def create_job(job_id: str, ra: str):
@@ -248,3 +255,32 @@ def clear_student_profile(ra: str):
         c.execute('DELETE FROM student_profiles WHERE ra = ?', (ra,))
         conn.commit()
     logger.info(f"[Memória] Perfil do aluno {ra} APAGADO com sucesso!")
+
+def set_mcp_cache(cache_key: str, payload: str, ttl_hours: int = 2):
+    """Armazena um json/texto de resposta do MCP no cache com tempo de expiração."""
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO mcp_cache (cache_key, payload, expires_at)
+            VALUES (?, ?, datetime('now', '+' || ? || ' hours'))
+            ON CONFLICT(cache_key) DO UPDATE SET 
+                payload = excluded.payload,
+                expires_at = datetime('now', '+' || ? || ' hours')
+        ''', (cache_key, payload, ttl_hours, ttl_hours))
+        conn.commit()
+
+def get_mcp_cache(cache_key: str) -> str:
+    """Busca um dado do MCP cacheado se não estiver expirado. Remove do banco se expirou."""
+    with sqlite3.connect(DB_PATH, timeout=10.0, check_same_thread=False) as conn:
+        c = conn.cursor()
+        
+        # Limpeza preguiçosa (Lazy deletion) geral para manter banco limpo
+        c.execute("DELETE FROM mcp_cache WHERE expires_at < datetime('now')")
+        conn.commit()
+        
+        c.execute('SELECT payload FROM mcp_cache WHERE cache_key = ? AND expires_at >= datetime("now")', (cache_key,))
+        row = c.fetchone()
+        
+    if row:
+        return row[0]
+    return None
